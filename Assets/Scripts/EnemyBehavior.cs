@@ -163,14 +163,14 @@ public class EnemyBehavior : MonoBehaviour
         playerInSight = CheckPlayerInSight();
 
         //Method to draw the ray in scene for debug purpose
-	    Debug.DrawRay(this.transform.position , playerDirection * peripheralVisionRadius, Color.red);
+	    Debug.DrawRay(this.transform.position , playerDirection * visionRadius, Color.red);
 
         //Debug.Log(playerInSight);
     }
 
     private bool CheckPlayerInSight() {
         //Check if obstacle is between player and enemy
-        RaycastHit2D checkObstacle = Physics2D.Raycast(this.transform.position, playerDirection, peripheralVisionRadius, LayerMask.GetMask("Obstacle"));
+        RaycastHit2D checkObstacle = Physics2D.Raycast(this.transform.position, playerDirection, visionRadius, LayerMask.GetMask("Obstacle"));
 
         // checking if player is within sight
         if ((moveAngle - visionOuterAngle/2 + 5.0f <= playerLocationAngle 
@@ -223,7 +223,7 @@ public class EnemyBehavior : MonoBehaviour
 
             peripheralVision.pointLightOuterRadius = peripheralVisionRadius + 0.5f;
             peripheralVision.intensity = 2.5f;
-            visionRadius = visionRadius * 1.5f;
+            visionCone.pointLightOuterRadius = visionRadius * 1.5f;
 
             if (playerInSight) {
                 rageCountdown = rageMaxCount;
