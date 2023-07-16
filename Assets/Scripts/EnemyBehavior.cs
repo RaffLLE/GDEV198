@@ -65,6 +65,7 @@ public class EnemyBehavior : MonoBehaviour
     public bool playerInSight;
     public bool inRage;
     public bool inHazard;
+    string currHazard;
 
     // enemy stats
     float baseSpeed;
@@ -79,6 +80,9 @@ public class EnemyBehavior : MonoBehaviour
         patrolPath = gameObject.GetComponent<PatrolPath>();
 
         player = GameObject.FindGameObjectWithTag("Player");
+
+        // do not collide with anything in the same layer "enemy"
+        Physics2D.IgnoreLayerCollision(7, 7, true);
 
         // !!!----Engkanto Stats----!!!
         if (enemyType == EnemyType.Engkanto) {
@@ -105,7 +109,7 @@ public class EnemyBehavior : MonoBehaviour
             rageMaxCount = 15.0f;
 
             baseSpeed = 1.0f;
-            chasingSpeed = 1.5f;
+            chasingSpeed = 2.0f;
             detectRadius = 5.0f;
         }
 
@@ -125,7 +129,7 @@ public class EnemyBehavior : MonoBehaviour
 
             rageGauge = 0.0f;
             minRage = 0.0f;
-            maxRage = 15.0f;
+            maxRage = 20.0f;
             rageIncreaseValue = 30.0f;
             rageDecreaseValue = 2.0f;
 
@@ -137,8 +141,8 @@ public class EnemyBehavior : MonoBehaviour
             detectRadius = 6.0f;
         }
 
-
-
+        inHazard = false;
+        inRage = false;
         Reset();
     }
 
@@ -159,21 +163,23 @@ public class EnemyBehavior : MonoBehaviour
         playerInSight = CheckPlayerInSight();
 
         //Method to draw the ray in scene for debug purpose
-	    Debug.DrawRay(this.transform.position , playerDirection * playerDistance, Color.red);
+	    Debug.DrawRay(this.transform.position , playerDirection * peripheralVisionRadius, Color.red);
 
         //Debug.Log(playerInSight);
     }
 
     private bool CheckPlayerInSight() {
         //Check if obstacle is between player and enemy
-        RaycastHit2D checkObstacle = Physics2D.Raycast(this.transform.position, playerDirection, playerDistance, LayerMask.GetMask("Obstacle"));
-        
+        RaycastHit2D checkObstacle = Physics2D.Raycast(this.transform.position, playerDirection, peripheralVisionRadius, LayerMask.GetMask("Obstacle"));
+
         // checking if player is within sight
         if ((moveAngle - visionOuterAngle/2 + 5.0f <= playerLocationAngle 
                     && moveAngle + visionOuterAngle/2 - 5.0f >= playerLocationAngle
                     && playerDistance <= visionRadius)
                     || playerDistance <= peripheralVisionRadius) {
-            if (checkObstacle.collider == null) { return true;}
+            if (checkObstacle.collider == null) { 
+                return true;
+            }
             else if (Vector3.Distance(this.transform.position, checkObstacle.collider.transform.position) < 
                         Vector3.Distance(this.transform.position, player.transform.position)) { return false;}
             else { return true;}
@@ -193,16 +199,13 @@ public class EnemyBehavior : MonoBehaviour
 
         if (playerInSight) {
             rageGaugeIncrease(rageIncreaseValue * Time.deltaTime);
-            if (!inHazard) { enemyMovement.maxSpeed = baseSpeed/2;}
+            enemyMovement.maxSpeed = baseSpeed/2;
         }
         else {
             rageGaugeDecrease(rageDecreaseValue * Time.deltaTime);
-            if (!inHazard) {  enemyMovement.maxSpeed = baseSpeed;}
+            enemyMovement.maxSpeed = baseSpeed;
         }
         rageGauge = Mathf.Clamp(rageGauge, minRage, maxRage);
-
-        //Debug.Log(playerInSight);
-        //Debug.Log(rageGauge);
 
         visionCone.color = Color.Lerp(Color.white, Color.red, rageGauge/maxRage);
         peripheralVision.color = Color.Lerp(Color.white, Color.red, rageGauge/maxRage);
@@ -212,13 +215,15 @@ public class EnemyBehavior : MonoBehaviour
             rageCountdown = rageMaxCount;
 
             destinationSetter.target = player.transform;
+        }
+
+        if (inRage) {
+
             enemyMovement.maxSpeed = chasingSpeed;
 
             peripheralVision.pointLightOuterRadius = peripheralVisionRadius + 0.5f;
             peripheralVision.intensity = 2.5f;
-        }
-
-        if (inRage) {
+            visionRadius = visionRadius * 1.5f;
 
             if (playerInSight) {
                 rageCountdown = rageMaxCount;
@@ -232,6 +237,17 @@ public class EnemyBehavior : MonoBehaviour
                 Reset();
             }
             Debug.Log(rageCountdown);
+        }
+
+        if (inHazard) {
+            HazardDebuff(currHazard, enemyType);
+        }
+
+        else if (inRage) {
+            enemyMovement.maxSpeed = chasingSpeed;
+        }
+        else {
+            enemyMovement.maxSpeed = baseSpeed;
         }
     }
 
@@ -283,21 +299,32 @@ public class EnemyBehavior : MonoBehaviour
         // states
         rageGauge = 0.0f;
         inRage = false;
+        inHazard = false;
     }
 
     // when in contact with a trigger
     private void OnTriggerStay2D(Collider2D collider) {
-        if (collider.name == "Hazards") {
-            enemyMovement.maxSpeed = baseSpeed/5;
-            Debug.Log("pain");
-        }
-        else if (collider.name == "Hazards 2" && enemyType != EnemyType.Markupo) {
-            enemyMovement.maxSpeed = baseSpeed/8;
-            Debug.Log("pain 2");
-        }
+        currHazard = collider.name;
+        inHazard = true;
     }
 
     private void OnTriggerExit2D(Collider2D collider) {
-        enemyMovement.maxSpeed = baseSpeed;
+        currHazard = null;
+        inHazard = false;
+    }
+
+    void HazardDebuff(string hazard, EnemyType enemy) {
+        
+        //Debug.Log(hazard);
+        if (hazard == "Hazards") {
+            enemyMovement.maxSpeed = 0.5f;
+        }
+
+        if (hazard == "Hazards 2") {
+            enemyMovement.maxSpeed = 0.1f;
+            if (enemy == EnemyType.Markupo) {
+                enemyMovement.maxSpeed = chasingSpeed;
+            }
+        }
     }
 }

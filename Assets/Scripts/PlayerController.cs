@@ -131,7 +131,7 @@ public class PlayerController : MonoBehaviour
 
     // when in contact with a trigger
     private void OnTriggerStay2D(Collider2D collider) {
-        Debug.Log(collider.name);
+        //Debug.Log(collider.name);
         inHazard = true;
         if (collider.name == "Hazards") {
             speed = crouchSpeed/2;
