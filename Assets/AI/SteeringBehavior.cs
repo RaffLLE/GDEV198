@@ -2,17 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SteeringBehavior : MonoBehaviour
+public abstract class SteeringBehavior : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+    public abstract (float[] danger, float[] interest) 
+        GetSteering(float[] danger, float[] interest, AIData aiData);
 }
