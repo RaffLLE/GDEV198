@@ -5881,8 +5881,8 @@ GameObject:
   - component: {fileID: 1344557404}
   - component: {fileID: 1344557405}
   - component: {fileID: 1344557406}
-  - component: {fileID: 1344557407}
   - component: {fileID: 1344557408}
+  - component: {fileID: 1344557407}
   m_Layer: 0
   m_Name: Enemy
   m_TagString: Enemy
@@ -6017,6 +6017,8 @@ MonoBehaviour:
   attackDistance: 2
   attackDelay: 1
   alertDelay: 0.75
+  jerkDuration: 0.075
+  jerkIntensity: 5
   movementInput: {x: 0, y: 0}
   movementDirectionSolver: {fileID: 1053138267}
 --- !u!50 &1344557407
@@ -6052,7 +6054,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4cd2e6117af5e9848b64dbbb8f5e700d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementSpeed: 5
+  baseSpeed: 4
 --- !u!1 &1661039660
 GameObject:
   m_ObjectHideFlags: 0

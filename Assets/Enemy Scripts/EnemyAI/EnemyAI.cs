@@ -32,7 +32,7 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Alert")]
     [SerializeField]
-    private float alertDelay = 1f;
+    private float alertDelay = 2.0f, jerkDuration = 1.0f, jerkIntensity = 10.0f;
 
     [SerializeField]
     private Vector2 movementInput;
@@ -78,11 +78,26 @@ public class EnemyAI : MonoBehaviour
     }
 
     private IEnumerator Alerted(){
+
+        following = true;
+        // set target to last position player seen
+        movementInput = movementDirectionSolver.GetDirectionToMove(steeringBehaviors, aiData);
+
+        // show warning sign
         alertWarning.SetActive(true);
         SoundManager.Instance.PlaySound(alertSound, 0.3f);
-        following = true;
+
+        // jerk
+        controller.ChangeSpeed(jerkIntensity);
+        yield return new WaitForSeconds(jerkDuration);
+
+        // stop
+        controller.ChangeSpeed(0.0f);
         yield return new WaitForSeconds(alertDelay);
+
+        // follow
         alertWarning.SetActive(false);
+        controller.Reset();
         StartCoroutine(ChaseAndAttack());
     }
 

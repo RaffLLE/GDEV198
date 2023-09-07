@@ -8,11 +8,14 @@ public class EnemyController : MonoBehaviour
     private Vector2 moveforce;
     
     [SerializeField]
-    private float movementSpeed;
+    private float baseSpeed;
+
+    float movementSpeed;
 
     // Start is called before the first frame update
     void Start()
     {
+        Reset();
         rb = GetComponent<Rigidbody2D>();
     }
 
@@ -24,5 +27,13 @@ public class EnemyController : MonoBehaviour
 
     public void MovementInput(Vector2 movement) {
         moveforce = movement;
+    }
+
+    public void ChangeSpeed(float newSpeed) {
+        movementSpeed = newSpeed;
+    }
+
+    public void Reset(){
+        movementSpeed = baseSpeed;
     }
 }
