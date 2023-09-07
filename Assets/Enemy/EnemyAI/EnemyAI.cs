@@ -5,6 +5,14 @@ using UnityEngine.Events;
 
 public class EnemyAI : MonoBehaviour
 {
+    private EnemyController controller;
+
+    [Header("Alert")]
+    [SerializeField]
+    private GameObject alertWarning;
+    [SerializeField]
+    private AudioClip alertSound;
+
     [SerializeField]
     private List<SteeringBehavior> steeringBehaviors;
 
@@ -14,15 +22,17 @@ public class EnemyAI : MonoBehaviour
     [SerializeField]
     private AIData aiData;
 
+    [Header("Detection Update")]
     [SerializeField]
-    private float detectionDelay = 0.05f, aiUpdateDelay = 0.06f, attackDelay = 1f;
+    private float detectionDelay = 0.05f, aiUpdateDelay = 0.06f;
 
+    [Header("Attack")]
     [SerializeField]
-    private float attackDistance = 0.5f;
+    private float attackDistance = 0.5f, attackDelay = 1f;
 
-    //Inputs sent from the Enemy AI to the Enemy controller
-    public UnityEvent OnAttackPressed;
-    public UnityEvent<Vector2> OnMovementInput, OnPointerInput;
+    [Header("Alert")]
+    [SerializeField]
+    private float alertDelay = 1f;
 
     [SerializeField]
     private Vector2 movementInput;
@@ -36,6 +46,7 @@ public class EnemyAI : MonoBehaviour
     {
         //Detecting Player and Obstacles around
         InvokeRepeating("PerformDetection", 0, detectionDelay);
+        controller = GetComponent<EnemyController>();
     }
 
     private void PerformDetection()
@@ -52,11 +63,9 @@ public class EnemyAI : MonoBehaviour
         if (aiData.currentTarget != null)
         {
             //Looking at the Target
-            OnPointerInput?.Invoke(aiData.currentTarget.position);
             if (following == false)
             {
-                following = true;
-                StartCoroutine(ChaseAndAttack());
+                StartCoroutine(Alerted());
             }
         }
         else if (aiData.GetTargetsCount() > 0)
@@ -65,7 +74,16 @@ public class EnemyAI : MonoBehaviour
             aiData.currentTarget = aiData.targets[0];
         }
         //Moving the Agent
-        OnMovementInput?.Invoke(movementInput);
+        controller.MovementInput(movementInput);
+    }
+
+    private IEnumerator Alerted(){
+        alertWarning.SetActive(true);
+        SoundManager.Instance.PlaySound(alertSound, 0.3f);
+        following = true;
+        yield return new WaitForSeconds(alertDelay);
+        alertWarning.SetActive(false);
+        StartCoroutine(ChaseAndAttack());
     }
 
     private IEnumerator ChaseAndAttack()
@@ -81,12 +99,11 @@ public class EnemyAI : MonoBehaviour
         else
         {
             float distance = Vector2.Distance(aiData.currentTarget.position, transform.position);
-
             if (distance < attackDistance)
             {
                 //Attack logic
                 movementInput = Vector2.zero;
-                OnAttackPressed?.Invoke();
+                Debug.Log("Attack");
                 yield return new WaitForSeconds(attackDelay);
                 StartCoroutine(ChaseAndAttack());
             }

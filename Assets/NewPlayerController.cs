@@ -40,15 +40,15 @@ public class NewPlayerController : MonoBehaviour
     void Reset() {
         moveSpeed = baseSpeed;
     }
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        // Enemy Knockback
-        if (collision.collider.CompareTag("Enemy"))
-        {
-            Vector2 enemyPos = collision.gameObject.transform.position;
-            Debug.Log(rb.position - enemyPos);
-            forceToApply += (rb.position - enemyPos) * 50;
-            //Destroy(collision.gameObject);
-        }
-    }
+    // private void OnCollisionEnter2D(Collision2D collision)
+    // {
+    //     // Enemy Knockback
+    //     if (collision.collider.CompareTag("Enemy"))
+    //     {
+    //         Vector2 enemyPos = collision.gameObject.transform.position;
+    //         Debug.Log(rb.position - enemyPos);
+    //         forceToApply += (rb.position - enemyPos) * 50;
+    //         //Destroy(collision.gameObject);
+    //     }
+    // }
 }
