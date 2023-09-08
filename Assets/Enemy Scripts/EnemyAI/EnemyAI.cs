@@ -34,19 +34,24 @@ public class EnemyAI : MonoBehaviour
     [SerializeField]
     private float alertDelay = 2.0f, jerkDuration = 1.0f, jerkIntensity = 10.0f;
 
+    [Header("Patrol")]
+    [SerializeField]
+    private float patrolSpeed = 2.0f;
+
     [SerializeField]
     private Vector2 movementInput;
 
     [SerializeField]
     private ContextSolver movementDirectionSolver;
 
-    bool following = false;
+    //bool following = false;
 
     private void Start()
     {
         //Detecting Player and Obstacles around
         InvokeRepeating("PerformDetection", 0, detectionDelay);
         controller = GetComponent<EnemyController>();
+        StartCoroutine(Patrol());
     }
 
     private void PerformDetection()
@@ -59,16 +64,7 @@ public class EnemyAI : MonoBehaviour
 
     private void Update()
     {
-        //Enemy AI movement based on Target availability
-        if (aiData.currentTarget != null)
-        {
-            //Looking at the Target
-            if (following == false)
-            {
-                StartCoroutine(Alerted());
-            }
-        }
-        else if (aiData.GetTargetsCount() > 0)
+        if (aiData.GetTargetsCount() > 0)
         {
             //Target acquisition logic
             aiData.currentTarget = aiData.targets[0];
@@ -79,7 +75,7 @@ public class EnemyAI : MonoBehaviour
 
     private IEnumerator Alerted(){
 
-        following = true;
+        //following = true;
         // set target to last position player seen
         movementInput = movementDirectionSolver.GetDirectionToMove(steeringBehaviors, aiData);
 
@@ -108,8 +104,8 @@ public class EnemyAI : MonoBehaviour
             //Stopping Logic
             Debug.Log("Stopping");
             movementInput = Vector2.zero;
-            following = false;
-            yield break;
+            //following = false;
+            StartCoroutine(Patrol());
         }
         else
         {
@@ -117,7 +113,7 @@ public class EnemyAI : MonoBehaviour
             if (distance < attackDistance)
             {
                 //Attack logic
-                movementInput = Vector2.zero;
+                movementInput = movementDirectionSolver.GetDirectionToMove(steeringBehaviors, aiData) * 0;
                 Debug.Log("Attack");
                 yield return new WaitForSeconds(attackDelay);
                 StartCoroutine(ChaseAndAttack());
@@ -132,5 +128,20 @@ public class EnemyAI : MonoBehaviour
 
         }
 
+    }
+
+    private IEnumerator Patrol()
+    {
+        if (aiData.currentTarget != null)
+        {
+            StartCoroutine(Alerted());
+        }
+        else {
+            movementInput = movementDirectionSolver.GetDirectionToMove(steeringBehaviors, aiData);
+            controller.ChangeSpeed(patrolSpeed);
+            yield return new WaitForSeconds(aiUpdateDelay);
+            StartCoroutine(Patrol());
+        }
+        yield break;
     }
 }
