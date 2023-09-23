@@ -9,13 +9,11 @@ public class PatrolPath : MonoBehaviour
     int waypointIndex;
 
     AIDestinationSetter destinationSetter;
-    EnemyBehavior enemyBehavior;
 
     // Start is called before the first frame update
     void Start()
     {
         destinationSetter = gameObject.GetComponent<AIDestinationSetter>();
-        enemyBehavior = gameObject.GetComponent<EnemyBehavior>();
         UpdateDestination(waypoints[waypointIndex]); 
     }
 
