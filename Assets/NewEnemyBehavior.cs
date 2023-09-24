@@ -49,8 +49,21 @@ public class NewEnemyBehavior : MonoBehaviour
     [Header("Rage Meter")]
     public float currentRage;
     public float maxRage;
+
+    [Header("Chase Values")]
+    public float maxChaseTimer;
+    public float currChaseTimer;
+    public float chaseSpeed;
+
     [Header("Alerted Values")]
     public float alertTimeDelay;
+
+    [Header("Attack Values")]
+    public float attackCooldown;
+    public float attackDistance;
+    public float attackWindup;
+    public float attackDuration;
+    public bool canAttack = true;
 
     // Start is called before the first frame update
     void Start()
@@ -63,6 +76,9 @@ public class NewEnemyBehavior : MonoBehaviour
         facingDirection = Vector2.up;
         rigidbody.velocity = Vector2.zero;
         StartCoroutine(StartState());
+
+        movementSpeed = minMovementSpeed;
+        rotationSpeed = minRotationSpeed;
         
     }
 
@@ -75,37 +91,40 @@ public class NewEnemyBehavior : MonoBehaviour
         float signedAngle = Vector2.SignedAngle(facingDirection, targetDirection); // Calculate the signed angle between current vector and target vector
         float sign = Mathf.Sign(signedAngle); // Gives 1 or -1 given the signedAngle
 
-        // Use Mathf.Lerp to interpolate between the current angle and the target angle
-        float step = rotationSpeed *  Time.deltaTime;
-        float newAngle = Mathf.LerpAngle(0, angle * sign, step);
+        float moveSpeedModifier;
+        float rotationSpeedModifier;
 
         // if not facing the same way as direction you turn faster, but move slower
         if (Mathf.Abs(signedAngle) > 25.0f)  
         {
-            movementSpeed = minMovementSpeed;
-            rotationSpeed = maxRotationSpeed;
+            moveSpeedModifier = 0.3f;
+            rotationSpeedModifier = 1.5f;
         }
         else {
             if (Vector2.Distance(transform.position, destinationSetter.target.position) < slowdownDistance) 
             {
-                movementSpeed = slowdownMovementSpeed;
-                rotationSpeed = minRotationSpeed;
+                moveSpeedModifier = 0.3f;
+                rotationSpeedModifier = 0.3f;
             }
             else 
             {
-                rotationSpeed = maxRotationSpeed;
-                movementSpeed = maxMovementSpeed;
+                moveSpeedModifier = 1.0f;
+                rotationSpeedModifier = 1.0f;
             }
         }
 
+        // Use Mathf.Lerp to interpolate between the current angle and the target angle
+        float step = rotationSpeed * rotationSpeedModifier *  Time.deltaTime;
+        float newAngle = Mathf.LerpAngle(0, angle * sign, step);
+
         if (playerInDirectVision() || playerInPeripheralVision()) {
-            lastSeenLocation = player.transform;
+            lastSeenLocation.position = player.transform.position;
         }
 
         // Rotate the current vector
         facingDirection = Quaternion.Euler(0, 0, newAngle) * facingDirection;
 
-        targetVelocity = targetDirection * movementSpeed;// * Time.deltaTime;
+        targetVelocity = targetDirection * movementSpeed * moveSpeedModifier;// * Time.deltaTime;
     }
 
     private IEnumerator StartState(){
@@ -118,6 +137,8 @@ public class NewEnemyBehavior : MonoBehaviour
         else {
             destinationSetter.target = transform;
         }
+        movementSpeed = maxMovementSpeed;
+        rotationSpeed = maxRotationSpeed;
         StartCoroutine(PatrolState());
     }
 
@@ -126,37 +147,108 @@ public class NewEnemyBehavior : MonoBehaviour
         // Move towards facingDirection
         rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
 
-        //Debug.Log(rigidbody.velocity.magnitude);
+        if (Vector2.Distance(transform.position, destinationSetter.target.position) < 0.2){
 
-        if (Vector2.Distance(transform.position, destinationSetter.target.position) < 0.2)
-        {
             yield return new WaitForSeconds(waitTimeBetweenPoints);
             IterateWaypointIndex();
             UpdateDestination(patrolPoints[pointIndex]);
         }
 
         yield return new WaitForSeconds(aiUpdateDelay);
-        StartCoroutine(PatrolState());
+        if (playerInDirectVision() || playerInPeripheralVision()){
+
+            StartCoroutine(Alerted());
+        }
+        else {
+
+            StartCoroutine(PatrolState());
+        }
     }
 
-    // private IEnumerator Alerted() {
-    //     destinationSetter.target = lastSeenLocation;
-    //     rigidbody.velocity = Vector2.zero;
-    //     yield return new WaitForSeconds(alertTimeDelay);
-    //     StartCoroutine(CuriousState());
-    // }
+    private IEnumerator Alerted() {
+        Debug.Log("Alerted");
+        destinationSetter.target = lastSeenLocation;
+        rigidbody.velocity = Vector2.zero;
+        yield return new WaitForSeconds(alertTimeDelay);
+        movementSpeed = maxMovementSpeed;
+        rotationSpeed = maxRotationSpeed;
+        StartCoroutine(Searching());
+    }
 
-    // private IEnumerator CuriousState() {
-    //     rigidbody.velocity = targetVelocity;
-    //     // if (Vector2.Distance(lastSeenLocation.position, transform.position) < 0.2f) {
+    private IEnumerator Searching() {
+        yield return new WaitForSeconds(aiUpdateDelay);
+        Debug.Log("Searching");
+        rigidbody.velocity = targetVelocity;
+        if (playerInDirectVision() || playerInPeripheralVision()) {
 
-    //     // }
-    //     StartCoroutine(CuriousState());
-    // }
+            currChaseTimer = maxChaseTimer;
+            movementSpeed = maxMovementSpeed * 1.2f;
+            rotationSpeed = maxRotationSpeed * 1.2f;
+            StartCoroutine(ChaseState());
+        }
+        else {
+            if (Vector2.Distance(lastSeenLocation.position, transform.position) < 0.5f){
+                StartCoroutine(PatrolState());
+            }
+            else {
+                StartCoroutine(Searching());
+            }
+        }
+    }
 
-    // private IEnumerator ChaseState() {
+    private IEnumerator ChaseState() {
+        rigidbody.velocity = targetVelocity;
+        yield return new WaitForSeconds(aiUpdateDelay);
+        Debug.Log(currChaseTimer);
 
-    // }
+        if (playerInDirectVision() || playerInPeripheralVision()) {
+
+            currChaseTimer = maxChaseTimer;
+        }
+        else {
+
+            currChaseTimer -= Time.deltaTime;
+        }
+
+        if (currChaseTimer <= 0) {
+            StartCoroutine(PatrolState());
+            movementSpeed = maxMovementSpeed;
+            rotationSpeed = maxRotationSpeed;
+        }
+        else {
+            if (Vector2.Distance(player.transform.position, transform.position) < attackDistance && canAttack) {
+                StartCoroutine(Attack());
+            }
+            else {
+                StartCoroutine(ChaseState());
+
+            }
+        }
+    }
+
+    private IEnumerator Attack() {
+        // wind up
+        rigidbody.velocity = Vector2.zero;
+        yield return new WaitForSeconds(attackWindup);
+        Vector2 attackDirection = targetVelocity.normalized; 
+
+        // attack
+        rigidbody.velocity = attackDirection * 5.0f;
+        yield return new WaitForSeconds(attackDuration);
+        StartCoroutine(AttackCooldown());
+
+        // stop
+        rigidbody.velocity = Vector2.zero;
+
+        // go back to chase
+        StartCoroutine(ChaseState());
+    }
+
+    private IEnumerator AttackCooldown() {
+        canAttack = false;
+        yield return new WaitForSeconds(attackCooldown);
+        canAttack = true;
+    }
 
     private bool playerInPeripheralVision() {
         if (player == null) return false;
