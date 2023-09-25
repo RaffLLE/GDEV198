@@ -16,17 +16,23 @@ public class NewPlayerController : MonoBehaviour
     [SerializeField]
     private float baseSpeed;
 
+    [Header("Player Info")]
+    private bool moveDisabled;
+
     // Start is called before the first frame update
     void Start()
     {
+        Application.targetFrameRate = 60;
         Reset();
     }
 
     // Update is called once per frame
     void Update()
     {
-        playerInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
-        moveForce = playerInput * moveSpeed;
+        if (!moveDisabled) {
+            playerInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
+            moveForce = playerInput * moveSpeed;
+        }
     }
 
     void FixedUpdate() {
@@ -40,6 +46,7 @@ public class NewPlayerController : MonoBehaviour
     void Reset() {
         moveSpeed = baseSpeed;
     }
+
     // private void OnCollisionEnter2D(Collision2D collision)
     // {
     //     // Enemy Knockback

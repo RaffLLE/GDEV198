@@ -13,6 +13,7 @@ public class NewEnemyBehavior : MonoBehaviour
     public AIPath aipath;
     public Rigidbody2D rigidbody;
     public AIDestinationSetter destinationSetter;
+    Animator animator;
     public LayerMask obstaclesLayerMask;
     public LayerMask enemiesLayerMask;
 
@@ -85,6 +86,7 @@ public class NewEnemyBehavior : MonoBehaviour
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         destinationSetter = gameObject.GetComponent<AIDestinationSetter>();
         player = GameObject.FindGameObjectWithTag("Player");
+        animator = gameObject.GetComponent<Animator>();
 
         facingDirection = Vector2.up;
         rigidbody.velocity = Vector2.zero;
@@ -93,6 +95,7 @@ public class NewEnemyBehavior : MonoBehaviour
         changeSpeed(patrolMovementSpeed,
                     patrolRotationSpeed);
         
+        animator.Play("Flying_Enemy_Idle");
     }
 
     void Update()
@@ -142,6 +145,9 @@ public class NewEnemyBehavior : MonoBehaviour
 
         // Rotate the current vector
         facingDirection = Quaternion.Euler(0, 0, newAngle) * facingDirection;
+
+        // Look left when facing left
+        transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
 
         targetVelocity = targetDirection * movementSpeed * moveSpeedModifier;// * Time.deltaTime;
 
@@ -198,8 +204,9 @@ public class NewEnemyBehavior : MonoBehaviour
 
         peripheralRadius = alertPeripheralRadius;
         visionRadius = alertVisionRadius;
-
+        animator.Play("Flying_Enemy_Alerted");
         yield return new WaitForSeconds(alertTimeDelay);
+        animator.Play("Flying_Enemy_Idle");
 
         Debug.Log("Alerted");
         UpdateDestination(lastSeenLocation);
@@ -276,7 +283,7 @@ public class NewEnemyBehavior : MonoBehaviour
             currChaseTimer -= Time.deltaTime;
         }
 
-        if (currChaseTimer <= 0) {
+        if (currChaseTimer <= 0 && Vector2.Distance(lastSeenLocation.position, transform.position) < 0.4f) {
             UpdateDestination(patrolPoints[pointIndex]);
             StartCoroutine(PatrolState());
         }
@@ -303,6 +310,7 @@ public class NewEnemyBehavior : MonoBehaviour
 
         // wind up
         Debug.Log("Wind Up");
+        animator.Play("Flying_Enemy_Alerted");
         rigidbody.velocity = Vector2.zero;
         changeSpeed(movementSpeed, 
                     0.5f);
@@ -313,7 +321,7 @@ public class NewEnemyBehavior : MonoBehaviour
         Vector2 attackDirection = facingDirection.normalized; 
         changeSpeed(movementSpeed, 
                     0.1f);
-
+        animator.Play("Flying_Enemy_Attack");
         yield return new WaitForSeconds(lockOnDelay);
 
         // attack
@@ -328,11 +336,13 @@ public class NewEnemyBehavior : MonoBehaviour
                     chaseRotationSpeed);
 
         // go back to chase
+        animator.Play("Flying_Enemy_Idle");
         StartCoroutine(ChaseState());
     }
 
     private IEnumerator Stunned() {
         Debug.Log("Stunned");
+        animator.Play("Flying_Enemy_Knockdown");
         rigidbody.velocity = Vector2.zero;
         changeSpeed(0, 0);
         peripheralRadius = 0.3f;
@@ -341,6 +351,7 @@ public class NewEnemyBehavior : MonoBehaviour
         yield return new WaitForSeconds(stunDuration);
         rigidbody.drag = 1.0f;
         peripheralRadius = alertPeripheralRadius;
+        animator.Play("Flying_Enemy_Idle");
         if (playerSeen()) {
             changeSpeed(chaseMovementSpeed, 
                         chaseRotationSpeed);
@@ -358,11 +369,18 @@ public class NewEnemyBehavior : MonoBehaviour
         StartCoroutine(AttackCooldown());
     }
 
-    private IEnumerator Knockback(Vector2 collisionPoint) {
+    private IEnumerator Knockback(Vector2 collisionPoint, bool collidedWithPlayer) {
         //rigidbody.velocity = (collisionPoint - (Vector2)transform.position).normalized * 5.0f;
         rigidbody.velocity = -tempVelocity * 0.8f;
         yield return new WaitForSeconds(0.2f);
-        StartCoroutine(Stunned());
+        if (collidedWithPlayer) { 
+            animator.Play("Flying_Enemy_Idle");
+            StartCoroutine(AttackCooldown());
+            StartCoroutine(ChaseState());
+        }
+        else {
+            StartCoroutine(Stunned());
+        }
     }
 
     // ---------------------------------------------------
@@ -509,13 +527,14 @@ public class NewEnemyBehavior : MonoBehaviour
     }
 
     private void OnCollisionEnter2D(Collision2D collision) {
+
         if (!canAttack) {
             directionSign = -directionSign;
         }
         if (tempVelocity.magnitude >= 3.0f) {
             Debug.Log("OW");
             StopAllCoroutines();
-            StartCoroutine(Knockback(collision.gameObject.transform.position));
+            StartCoroutine(Knockback(collision.gameObject.transform.position, collision.collider.CompareTag("Player")));
         }
         // You can access collision information and handle the collision here
     }
