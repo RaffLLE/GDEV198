@@ -14,6 +14,7 @@ public class NewEnemyBehavior : MonoBehaviour
     public Rigidbody2D rigidbody;
     public AIDestinationSetter destinationSetter;
     public LayerMask obstaclesLayerMask;
+    public LayerMask enemiesLayerMask;
 
     [Header("Calculated Values")]
     public Vector2 targetDirection; 
@@ -21,25 +22,35 @@ public class NewEnemyBehavior : MonoBehaviour
     public Vector2 targetVelocity;
     public float movementSpeed;
     public float rotationSpeed;
+    public float peripheralRadius;
+    public float visionRadius;
+    public float moveSpeedModifier;
+    public float rotationSpeedModifier;
     public Transform lastSeenLocation;
+    float directionSign = 1.0f;
+    Vector2 tempVelocity;
+    Vector2 playerDirection;
+    float distanceToPlayer;
+    float angleToPlayer;
 
     [Header("AI Delay Values")]
     public float aiUpdateDelay;
     public float aiStartDelay;
 
     [Header("Movement Values")]
-    public float minMovementSpeed;
-    public float slowdownMovementSpeed;
     public float slowdownDistance;
-    public float maxMovementSpeed;
     public float movementAcceleration;
-    public float maxRotationSpeed; 
-    public float minRotationSpeed;
+    public float patrolMovementSpeed;
+    public float patrolRotationSpeed;
+    public float chaseMovementSpeed;
+    public float chaseRotationSpeed;
     
     [Header("Vision Values")]
-    public float directVisionRadius;
-    public float directVisionAngle;
-    public float peripheralRadius;
+    public float normalVisionRadius;
+    public float alertVisionRadius;
+    public float visionAngle;
+    public float normalPeripheralRadius;
+    public float alertPeripheralRadius;
 
     [Header("Patrol Values")]
     public List<Transform> patrolPoints = new List<Transform>();
@@ -53,7 +64,6 @@ public class NewEnemyBehavior : MonoBehaviour
     [Header("Chase Values")]
     public float maxChaseTimer;
     public float currChaseTimer;
-    public float chaseSpeed;
 
     [Header("Alerted Values")]
     public float alertTimeDelay;
@@ -64,6 +74,9 @@ public class NewEnemyBehavior : MonoBehaviour
     public float attackWindup;
     public float attackDuration;
     public bool canAttack = true;
+
+    [Header("Stunned Values")]
+    public float stunDuration;
 
     // Start is called before the first frame update
     void Start()
@@ -77,22 +90,32 @@ public class NewEnemyBehavior : MonoBehaviour
         rigidbody.velocity = Vector2.zero;
         StartCoroutine(StartState());
 
-        movementSpeed = minMovementSpeed;
-        rotationSpeed = minRotationSpeed;
+        changeSpeed(patrolMovementSpeed,
+                    patrolRotationSpeed);
         
     }
 
-    // Update is called once per frame
     void Update()
     {
-        targetDirection = (Vector2)(aipath.steeringTarget - transform.position).normalized; // Calculate the direction towards the path laid out by AIPath
+        // If player is in sights
+        if (playerSeen()) {
+            // Update last seen location to where player was seen and make the target facing direction the player
+            lastSeenLocation.position = player.transform.position;
+            targetDirection = (Vector2)(player.transform.position - transform.position).normalized;
+        }
+        else {
+            // If not, face the direction where they are pathing
+            targetDirection = (Vector2)(aipath.steeringTarget - transform.position).normalized; // Calculate the direction towards the path laid out by AIPath
+        }
 
         float angle = Vector2.Angle(facingDirection, targetDirection); // Calculate the angle between the current vector and the target vector
         float signedAngle = Vector2.SignedAngle(facingDirection, targetDirection); // Calculate the signed angle between current vector and target vector
         float sign = Mathf.Sign(signedAngle); // Gives 1 or -1 given the signedAngle
 
-        float moveSpeedModifier;
-        float rotationSpeedModifier;
+        // Values relative to player
+        playerDirection = (player.transform.position - transform.position).normalized;
+        distanceToPlayer = (player.transform.position - transform.position).magnitude;
+        angleToPlayer = Vector2.Angle(facingDirection, playerDirection);
 
         // if not facing the same way as direction you turn faster, but move slower
         if (Mathf.Abs(signedAngle) > 25.0f)  
@@ -117,34 +140,42 @@ public class NewEnemyBehavior : MonoBehaviour
         float step = rotationSpeed * rotationSpeedModifier *  Time.deltaTime;
         float newAngle = Mathf.LerpAngle(0, angle * sign, step);
 
-        if (playerInDirectVision() || playerInPeripheralVision()) {
-            lastSeenLocation.position = player.transform.position;
-        }
-
         // Rotate the current vector
         facingDirection = Quaternion.Euler(0, 0, newAngle) * facingDirection;
 
         targetVelocity = targetDirection * movementSpeed * moveSpeedModifier;// * Time.deltaTime;
+
+        // for collision purposes
+        tempVelocity = rigidbody.velocity;
+
+        //Debug.Log(rigidbody.velocity.magnitude);
     }
+
+    // ---------------------------------------------------
+    // States
+    // ---------------------------------------------------
 
     private IEnumerator StartState(){
 
         yield return new WaitForSeconds(aiStartDelay);
-        pointIndex = GetClosestPointIndex(patrolPoints);
-        if (patrolPoints != null){
-            destinationSetter.target = patrolPoints[pointIndex];
-        }
-        else {
-            destinationSetter.target = transform;
-        }
-        movementSpeed = maxMovementSpeed;
-        rotationSpeed = maxRotationSpeed;
+        targetClosestPatrolPoint();
+        changeSpeed(patrolMovementSpeed,
+                    patrolRotationSpeed);
+        peripheralRadius = normalPeripheralRadius;
+        visionRadius = normalVisionRadius;
         StartCoroutine(PatrolState());
+        rigidbody.drag = 1.0f;
     }
 
     private IEnumerator PatrolState() {
+        yield return new WaitForSeconds(aiUpdateDelay);
 
-        // Move towards facingDirection
+        changeSpeed(patrolMovementSpeed, 
+                    patrolRotationSpeed);
+        peripheralRadius = normalPeripheralRadius;
+        visionRadius = normalVisionRadius;
+
+        // Move towards facingDirection with acceleration
         rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
 
         if (Vector2.Distance(transform.position, destinationSetter.target.position) < 0.2){
@@ -153,9 +184,7 @@ public class NewEnemyBehavior : MonoBehaviour
             IterateWaypointIndex();
             UpdateDestination(patrolPoints[pointIndex]);
         }
-
-        yield return new WaitForSeconds(aiUpdateDelay);
-        if (playerInDirectVision() || playerInPeripheralVision()){
+        if (playerSeen()){
 
             StartCoroutine(Alerted());
         }
@@ -166,28 +195,34 @@ public class NewEnemyBehavior : MonoBehaviour
     }
 
     private IEnumerator Alerted() {
-        Debug.Log("Alerted");
-        destinationSetter.target = lastSeenLocation;
-        rigidbody.velocity = Vector2.zero;
+
+        peripheralRadius = alertPeripheralRadius;
+        visionRadius = alertVisionRadius;
+
         yield return new WaitForSeconds(alertTimeDelay);
-        movementSpeed = maxMovementSpeed;
-        rotationSpeed = maxRotationSpeed;
+
+        Debug.Log("Alerted");
+        UpdateDestination(lastSeenLocation);
+        rigidbody.velocity = Vector2.zero;
+        changeSpeed(patrolMovementSpeed * 0.8f,
+                    patrolRotationSpeed * 1.2f);
         StartCoroutine(Searching());
     }
 
     private IEnumerator Searching() {
         yield return new WaitForSeconds(aiUpdateDelay);
-        Debug.Log("Searching");
-        rigidbody.velocity = targetVelocity;
-        if (playerInDirectVision() || playerInPeripheralVision()) {
 
+        Debug.Log("Searching");
+        rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
+        if (playerSeen()) {
+            // changeSpeed(chaseMovementSpeed, 
+            //             chaseRotationSpeed);
             currChaseTimer = maxChaseTimer;
-            movementSpeed = maxMovementSpeed * 1.2f;
-            rotationSpeed = maxRotationSpeed * 1.2f;
             StartCoroutine(ChaseState());
         }
         else {
             if (Vector2.Distance(lastSeenLocation.position, transform.position) < 0.5f){
+                UpdateDestination(patrolPoints[pointIndex]);
                 StartCoroutine(PatrolState());
             }
             else {
@@ -197,57 +232,170 @@ public class NewEnemyBehavior : MonoBehaviour
     }
 
     private IEnumerator ChaseState() {
-        rigidbody.velocity = targetVelocity;
-        yield return new WaitForSeconds(aiUpdateDelay);
-        Debug.Log(currChaseTimer);
 
-        if (playerInDirectVision() || playerInPeripheralVision()) {
+        yield return new WaitForSeconds(aiUpdateDelay);
+        peripheralRadius = alertPeripheralRadius;
+        visionRadius = alertVisionRadius;
+
+        RaycastHit2D hit = 
+            Physics2D.Raycast((Vector2)transform.position + playerDirection * 0.5f, playerDirection, distanceToPlayer, enemiesLayerMask);
+
+        
+        // Debug.DrawRay((Vector2)transform.position, playerDirection * 4.0f, Color.red);
+
+        // if (hit.collider == null) {
+        //     Debug.Log("Clear");
+        // }
+        // else {
+        //     Debug.Log("Blocking");
+        // }
+
+        //Debug.Log("Chasing");
+        changeSpeed(chaseMovementSpeed, 
+                    chaseRotationSpeed);
+        if (distanceToPlayer < attackDistance 
+                && (playerSeen())) {
+            if (distanceToPlayer < attackDistance * 0.8f) {
+                rigidbody.velocity = Vector2.Lerp(-playerDirection * 1.2f, targetVelocity, Time.deltaTime * movementAcceleration);
+            }
+            else {
+                
+                rigidbody.velocity = rotateVector(targetVelocity * Mathf.Clamp((distanceToPlayer/attackDistance), 0, 1) * 0.3f, 90.0f * directionSign);
+            }
+        }
+        else {
+
+            rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
+        }
+
+        if (playerSeen()) {
 
             currChaseTimer = maxChaseTimer;
         }
         else {
-
             currChaseTimer -= Time.deltaTime;
         }
 
         if (currChaseTimer <= 0) {
+            UpdateDestination(patrolPoints[pointIndex]);
             StartCoroutine(PatrolState());
-            movementSpeed = maxMovementSpeed;
-            rotationSpeed = maxRotationSpeed;
         }
         else {
-            if (Vector2.Distance(player.transform.position, transform.position) < attackDistance && canAttack) {
+            if (Vector2.Distance(player.transform.position, transform.position) < attackDistance 
+                && canAttack
+                && (angleToPlayer < visionAngle/2)
+                && hit.collider == null) {
                 StartCoroutine(Attack());
             }
             else {
+                currChaseTimer -= 2.0f * Time.deltaTime;
                 StartCoroutine(ChaseState());
 
             }
         }
+
+        //Debug.Log(currChaseTimer);
     }
 
     private IEnumerator Attack() {
+
+        float lockOnDelay = attackWindup * 0.2f;
+
         // wind up
+        Debug.Log("Wind Up");
         rigidbody.velocity = Vector2.zero;
-        yield return new WaitForSeconds(attackWindup);
-        Vector2 attackDirection = targetVelocity.normalized; 
+        changeSpeed(movementSpeed, 
+                    0.5f);
+
+        yield return new WaitForSeconds(attackWindup - lockOnDelay);
+
+        // set target
+        Vector2 attackDirection = facingDirection.normalized; 
+        changeSpeed(movementSpeed, 
+                    0.1f);
+
+        yield return new WaitForSeconds(lockOnDelay);
 
         // attack
+        Debug.Log("Attack");
         rigidbody.velocity = attackDirection * 5.0f;
         yield return new WaitForSeconds(attackDuration);
         StartCoroutine(AttackCooldown());
 
         // stop
         rigidbody.velocity = Vector2.zero;
+        changeSpeed(movementSpeed, 
+                    chaseRotationSpeed);
 
         // go back to chase
         StartCoroutine(ChaseState());
     }
 
+    private IEnumerator Stunned() {
+        Debug.Log("Stunned");
+        rigidbody.velocity = Vector2.zero;
+        changeSpeed(0, 0);
+        peripheralRadius = 0.3f;
+        visionRadius = 0.0f;
+        rigidbody.drag = 20.0f;
+        yield return new WaitForSeconds(stunDuration);
+        rigidbody.drag = 1.0f;
+        peripheralRadius = alertPeripheralRadius;
+        if (playerSeen()) {
+            changeSpeed(chaseMovementSpeed, 
+                        chaseRotationSpeed);
+            peripheralRadius = alertPeripheralRadius;
+            visionRadius = alertVisionRadius;
+            StartCoroutine(ChaseState());
+        }
+        else {
+            changeSpeed(patrolMovementSpeed, 
+                        patrolRotationSpeed);
+            peripheralRadius = alertPeripheralRadius;
+            visionRadius = alertVisionRadius;
+            StartCoroutine(Searching());
+        }
+        StartCoroutine(AttackCooldown());
+    }
+
+    private IEnumerator Knockback(Vector2 collisionPoint) {
+        //rigidbody.velocity = (collisionPoint - (Vector2)transform.position).normalized * 5.0f;
+        rigidbody.velocity = -tempVelocity * 0.8f;
+        yield return new WaitForSeconds(0.2f);
+        StartCoroutine(Stunned());
+    }
+
+    // ---------------------------------------------------
+    // End of States
+    // ---------------------------------------------------
+
+    // ---------------------------------------------------
+    // Helper Functions
+    // ---------------------------------------------------
+
     private IEnumerator AttackCooldown() {
         canAttack = false;
-        yield return new WaitForSeconds(attackCooldown);
+        yield return new WaitForSeconds(Random.Range(attackCooldown, attackCooldown + 1.0f));
         canAttack = true;
+    }
+
+    public void changeSpeed(float newMovementSpeed, float newRotationSpeed) {
+        movementSpeed = newMovementSpeed;
+        rotationSpeed = newRotationSpeed;
+    } 
+
+    public void targetClosestPatrolPoint(){
+        pointIndex = GetClosestPointIndex(patrolPoints);
+        if (patrolPoints != null){
+            destinationSetter.target = patrolPoints[pointIndex];
+        }
+        else {
+            destinationSetter.target = transform;
+        }
+    }
+
+    private bool playerSeen() {
+        return (playerInDirectVision() || playerInPeripheralVision());
     }
 
     private bool playerInPeripheralVision() {
@@ -271,18 +419,12 @@ public class NewEnemyBehavior : MonoBehaviour
 
     private bool playerInDirectVision() {
         if (player == null) return false;
-
-        Vector2 playerDirection = (player.transform.position - transform.position).normalized;
-        float distanceToPlayer = (player.transform.position - transform.position).magnitude;
         RaycastHit2D hit = 
-            Physics2D.Raycast(transform.position, playerDirection, directVisionRadius   , obstaclesLayerMask);
+            Physics2D.Raycast(transform.position, playerDirection, visionRadius , obstaclesLayerMask);
 
+        if (distanceToPlayer > visionRadius) return false;
 
-        float angleToPlayer = Vector2.Angle(facingDirection, playerDirection);
-
-        if (distanceToPlayer > directVisionRadius) return false;
-
-        if (angleToPlayer > directVisionAngle/2) {
+        if (angleToPlayer > visionAngle/2) {
             return false;
         }
 
@@ -336,6 +478,14 @@ public class NewEnemyBehavior : MonoBehaviour
         return closestPointIndex;
     }
 
+    // ---------------------------------------------------
+    // End of Helper Functions
+    // ---------------------------------------------------
+
+    // ---------------------------------------------------
+    // Built In Functions
+    // ---------------------------------------------------
+
     void OnDrawGizmos()
     {
         if (aipath != null)
@@ -348,13 +498,29 @@ public class NewEnemyBehavior : MonoBehaviour
             Gizmos.DrawLine(transform.position, (Vector2)transform.position + facingDirection.normalized * 1.0f);
 
             Gizmos.color = Color.magenta;
-            Gizmos.DrawWireSphere(transform.position, directVisionRadius);
+            Gizmos.DrawWireSphere(transform.position, visionRadius);
 
-            Gizmos.DrawLine(transform.position, (Vector2)transform.position + rotateVector(facingDirection, directVisionAngle/2) * directVisionRadius);
-            Gizmos.DrawLine(transform.position, (Vector2)transform.position + rotateVector(facingDirection, -directVisionAngle/2) * directVisionRadius);
+            Gizmos.DrawLine(transform.position, (Vector2)transform.position + rotateVector(facingDirection, visionAngle/2) * visionRadius);
+            Gizmos.DrawLine(transform.position, (Vector2)transform.position + rotateVector(facingDirection, -visionAngle/2) * visionRadius);
 
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(transform.position, peripheralRadius);
         }
     }
+
+    private void OnCollisionEnter2D(Collision2D collision) {
+        if (!canAttack) {
+            directionSign = -directionSign;
+        }
+        if (tempVelocity.magnitude >= 3.0f) {
+            Debug.Log("OW");
+            StopAllCoroutines();
+            StartCoroutine(Knockback(collision.gameObject.transform.position));
+        }
+        // You can access collision information and handle the collision here
+    }
+
+    // ---------------------------------------------------
+    // End of Built In Functions
+    // ---------------------------------------------------
 }
