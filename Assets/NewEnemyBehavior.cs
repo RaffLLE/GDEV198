@@ -358,6 +358,7 @@ public class NewEnemyBehavior : MonoBehaviour
         animator.Play("Flying_Enemy_Idle");
         changeSpeed(chaseMovementSpeed, 
                     chaseRotationSpeed);
+        canAttack = false;
         if (playerSeen()) {
             peripheralRadius = alertPeripheralRadius;
             visionRadius = alertVisionRadius;
@@ -368,7 +369,7 @@ public class NewEnemyBehavior : MonoBehaviour
             visionRadius = alertVisionRadius;
             StartCoroutine(Searching());
         }
-        yield return new WaitForSeconds(2.0f);
+        yield return new WaitForSeconds(3.0f);
         canAttack = true;
     }
 
