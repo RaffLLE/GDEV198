@@ -36,13 +36,22 @@ public class HelperBehavior : MonoBehaviour
 
         facingDirection = playerDirection;
 
-        if (assistReady) {
-            animator.Play("Merfolk_Idle");
-            if (Input.GetKeyDown(KeyCode.X)) {
-                animator.Play("Merfolk_Cast");
-                StartCoroutine(AssistCooldown());
-            }
+        // if (assistReady) {
+        //     animator.Play("Merfolk_Idle");
+        //     if (Input.GetKeyDown(KeyCode.X)) {
+        //         animator.Play("Merfolk_Cast");
+        //         StartCoroutine(AssistCooldown());
+        //     }
+        // }
+
+        if (Input.GetKeyDown(KeyCode.X)) {
+            playAnimationOnce("Merfolk_Cast");
         }
+
+        if (!AnimatorIsPlaying()) {
+            playAnimationOnce("Merfolk_Idle");
+        }
+
         // Look left when facing left
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
     }
@@ -51,5 +60,17 @@ public class HelperBehavior : MonoBehaviour
         assistReady = false;
         yield return new WaitForSeconds(assistCooldown);
         assistReady = true;
+    }
+
+    void playAnimationOnce(string animationName) {
+        if(!animator.GetCurrentAnimatorStateInfo(0).IsName(animationName))
+        {
+            animator.Play(animationName);
+        }
+    }
+
+    bool AnimatorIsPlaying(){
+        return animator.GetCurrentAnimatorStateInfo(0).length >
+            animator.GetCurrentAnimatorStateInfo(0).normalizedTime;
     }
 }

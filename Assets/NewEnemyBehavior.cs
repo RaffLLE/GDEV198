@@ -5,6 +5,8 @@ using UnityEngine;
 using Pathfinding;
 // For Couroutine
 using UnityEngine.Events;
+// For 2D Light
+using UnityEngine.Rendering.Universal;
 
 public class NewEnemyBehavior : MonoBehaviour
 {
@@ -13,7 +15,9 @@ public class NewEnemyBehavior : MonoBehaviour
     public AIPath aipath;
     public Rigidbody2D rigidbody;
     public AIDestinationSetter destinationSetter;
-    Animator animator;
+    Animator animator;    
+    public Light2D visionCone;
+    public Light2D peripheralVision;
     public LayerMask obstaclesLayerMask;
     public LayerMask enemiesLayerMask;
 
@@ -74,10 +78,15 @@ public class NewEnemyBehavior : MonoBehaviour
     public float attackDistance;
     public float attackWindup;
     public float attackDuration;
+    public float attackIntensity;
     public bool canAttack = true;
 
     [Header("Stunned Values")]
     public float stunDuration;
+
+    [Header("Others")]
+    public float currVisionFalloffTimer;
+    public float maxVisionFalloffTime;
 
     // Start is called before the first frame update
     void Start()
@@ -145,6 +154,12 @@ public class NewEnemyBehavior : MonoBehaviour
 
         // Rotate the current vector
         facingDirection = Quaternion.Euler(0, 0, newAngle) * facingDirection;
+
+        // Adjust vision cone to face facing direction
+        visionCone.transform.eulerAngles = new Vector3(0, 0, Vector2.SignedAngle(Vector2.up, facingDirection));
+
+        visionCone.pointLightOuterRadius = visionRadius + 0.5f;
+        peripheralVision.pointLightOuterRadius = Mathf.Min(peripheralRadius + 0.5f, visionRadius);
 
         // Look left when facing left
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
@@ -222,8 +237,6 @@ public class NewEnemyBehavior : MonoBehaviour
         Debug.Log("Searching");
         rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
         if (playerSeen()) {
-            // changeSpeed(chaseMovementSpeed, 
-            //             chaseRotationSpeed);
             currChaseTimer = maxChaseTimer;
             StartCoroutine(ChaseState());
         }
@@ -247,23 +260,14 @@ public class NewEnemyBehavior : MonoBehaviour
         RaycastHit2D hit = 
             Physics2D.Raycast((Vector2)transform.position + playerDirection * 0.5f, playerDirection, distanceToPlayer, enemiesLayerMask);
 
-        
-        // Debug.DrawRay((Vector2)transform.position, playerDirection * 4.0f, Color.red);
-
-        // if (hit.collider == null) {
-        //     Debug.Log("Clear");
-        // }
-        // else {
-        //     Debug.Log("Blocking");
-        // }
-
-        //Debug.Log("Chasing");
         changeSpeed(chaseMovementSpeed, 
                     chaseRotationSpeed);
         if (distanceToPlayer < attackDistance 
                 && (playerSeen())) {
-            if (distanceToPlayer < attackDistance * 0.8f) {
-                rigidbody.velocity = Vector2.Lerp(-playerDirection * 1.2f, targetVelocity, Time.deltaTime * movementAcceleration);
+            if (distanceToPlayer < attackDistance * 0.95f) {
+                rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, 
+                                                -playerDirection * 1.2f, 
+                                                Time.deltaTime * movementAcceleration);
             }
             else {
                 
@@ -326,7 +330,7 @@ public class NewEnemyBehavior : MonoBehaviour
 
         // attack
         Debug.Log("Attack");
-        rigidbody.velocity = attackDirection * 5.0f;
+        rigidbody.velocity = attackDirection * attackIntensity;
         yield return new WaitForSeconds(attackDuration);
         StartCoroutine(AttackCooldown());
 
@@ -345,28 +349,27 @@ public class NewEnemyBehavior : MonoBehaviour
         animator.Play("Flying_Enemy_Knockdown");
         rigidbody.velocity = Vector2.zero;
         changeSpeed(0, 0);
-        peripheralRadius = 0.3f;
-        visionRadius = 0.0f;
+        peripheralRadius = alertVisionRadius;
+        visionRadius = 0.6f;
         rigidbody.drag = 20.0f;
         yield return new WaitForSeconds(stunDuration);
         rigidbody.drag = 1.0f;
         peripheralRadius = alertPeripheralRadius;
         animator.Play("Flying_Enemy_Idle");
+        changeSpeed(chaseMovementSpeed, 
+                    chaseRotationSpeed);
         if (playerSeen()) {
-            changeSpeed(chaseMovementSpeed, 
-                        chaseRotationSpeed);
             peripheralRadius = alertPeripheralRadius;
             visionRadius = alertVisionRadius;
             StartCoroutine(ChaseState());
         }
         else {
-            changeSpeed(patrolMovementSpeed, 
-                        patrolRotationSpeed);
             peripheralRadius = alertPeripheralRadius;
             visionRadius = alertVisionRadius;
             StartCoroutine(Searching());
         }
-        StartCoroutine(AttackCooldown());
+        yield return new WaitForSeconds(2.0f);
+        canAttack = true;
     }
 
     private IEnumerator Knockback(Vector2 collisionPoint, bool collidedWithPlayer) {
