@@ -20,6 +20,7 @@ public class NewEnemyBehavior : MonoBehaviour
     public Light2D peripheralVision;
     public LayerMask obstaclesLayerMask;
     public LayerMask enemiesLayerMask;
+    public ParticleSystem alertEffect;
 
     [Header("Calculated Values")]
     public Vector2 targetDirection; 
@@ -37,6 +38,7 @@ public class NewEnemyBehavior : MonoBehaviour
     Vector2 playerDirection;
     float distanceToPlayer;
     float angleToPlayer;
+    public bool isAlert;
 
     [Header("AI Delay Values")]
     public float aiUpdateDelay;
@@ -99,7 +101,13 @@ public class NewEnemyBehavior : MonoBehaviour
 
         facingDirection = Vector2.up;
         rigidbody.velocity = Vector2.zero;
-        StartCoroutine(StartState());
+        if (!isAlert) {
+            StartCoroutine(StartState());
+        }
+        else {
+            currVisionFalloffTimer = maxVisionFalloffTime;
+            StartCoroutine(ChaseState());
+        }
 
         changeSpeed(patrolMovementSpeed,
                     patrolRotationSpeed);
@@ -112,12 +120,17 @@ public class NewEnemyBehavior : MonoBehaviour
         // If player is in sights
         if (playerSeen()) {
             // Update last seen location to where player was seen and make the target facing direction the player
-            lastSeenLocation.position = player.transform.position;
             targetDirection = (Vector2)(player.transform.position - transform.position).normalized;
+            currVisionFalloffTimer = maxVisionFalloffTime;
         }
         else {
             // If not, face the direction where they are pathing
             targetDirection = (Vector2)(aipath.steeringTarget - transform.position).normalized; // Calculate the direction towards the path laid out by AIPath
+            currVisionFalloffTimer -= Time.deltaTime;
+        }
+
+        if (currVisionFalloffTimer >= 0) {
+            lastSeenLocation.position = player.transform.position;
         }
 
         float angle = Vector2.Angle(facingDirection, targetDirection); // Calculate the angle between the current vector and the target vector
@@ -161,6 +174,16 @@ public class NewEnemyBehavior : MonoBehaviour
         visionCone.pointLightOuterRadius = visionRadius + 0.5f;
         peripheralVision.pointLightOuterRadius = Mathf.Min(peripheralRadius + 0.5f, visionRadius);
 
+        if (!isAlert) {
+            // Adjust intensity of light from enemy based on distance to player
+            float playerDetectionRadius = player.GetComponent<NewPlayerController>().detectionRadius;
+            visionCone.intensity = peripheralVision.intensity 
+                = Mathf.Lerp(0.2f, 1.5f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius);
+        }
+        else {
+            visionCone.intensity = peripheralVision.intensity = 1.2f;
+        }
+
         // Look left when facing left
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
 
@@ -190,6 +213,7 @@ public class NewEnemyBehavior : MonoBehaviour
 
     private IEnumerator PatrolState() {
         yield return new WaitForSeconds(aiUpdateDelay);
+        isAlert = false;
 
         changeSpeed(patrolMovementSpeed, 
                     patrolRotationSpeed);
@@ -220,6 +244,7 @@ public class NewEnemyBehavior : MonoBehaviour
         peripheralRadius = alertPeripheralRadius;
         visionRadius = alertVisionRadius;
         animator.Play("Flying_Enemy_Alerted");
+        alertEffect.Play();
         yield return new WaitForSeconds(alertTimeDelay);
         animator.Play("Flying_Enemy_Idle");
 
@@ -254,6 +279,8 @@ public class NewEnemyBehavior : MonoBehaviour
     private IEnumerator ChaseState() {
 
         yield return new WaitForSeconds(aiUpdateDelay);
+
+        isAlert = true;
         peripheralRadius = alertPeripheralRadius;
         visionRadius = alertVisionRadius;
 
@@ -288,6 +315,7 @@ public class NewEnemyBehavior : MonoBehaviour
         }
 
         if (currChaseTimer <= 0 && Vector2.Distance(lastSeenLocation.position, transform.position) < 0.4f) {
+            isAlert = false;
             UpdateDestination(patrolPoints[pointIndex]);
             StartCoroutine(PatrolState());
         }
@@ -379,6 +407,7 @@ public class NewEnemyBehavior : MonoBehaviour
         yield return new WaitForSeconds(0.2f);
         if (collidedWithPlayer) { 
             animator.Play("Flying_Enemy_Idle");
+            StartCoroutine(player.GetComponent<NewPlayerController>().TakeDamage(1.0f));
             StartCoroutine(AttackCooldown());
             StartCoroutine(ChaseState());
         }

@@ -10,10 +10,13 @@ public class NewPlayerController : MonoBehaviour
 {
     [Header("Object Reference")]
     public Rigidbody2D rigidbody;
-    public Light2D light;
+    public Light2D playerLight;
+    public Light2D globalLight;
     public ParticleSystem callEffect;
     public Animator animator;
     public Camera camera;
+    public Collider2D collider;
+    NewEnemyBehavior[] enemies;
     
     [Header("Physics Reference")]
     private float moveSpeed;
@@ -25,24 +28,32 @@ public class NewPlayerController : MonoBehaviour
     [Header("Base Player Stats")]
     public float baseSpeed;
     public float movementAcceleration;
+    public float detectionRadius;
 
     [Header("Player State")]
     private bool moveDisabled;
     private bool actionDisabled;
     private bool isCrouched;
-
-    [Header("Acttions")]
-    private bool canCall;
-    private bool canTumble;
+    public float MaxHP;
+    public float CurrHP;
+    private bool isImmune;
+    private bool inHazard;
+    private bool isChased; // If enemies are chasing
 
     [Header("Player Cooldowns")]
     public float callCooldown;
     public float tumbleCooldown;
+    public float immunityDuration;
+
+    [Header("Actions")]
+    private bool canCall;
+    private bool canTumble;
 
     [Header("Calculated Values")]
     public float moveSpeedModifier;
     public Vector2 targetVelocity;
     private Vector2 lastInput;
+    private Vector2 directionToClosestEnemy;
 
     [Header("Camera Values")]
     public Vector2 offset;
@@ -57,6 +68,10 @@ public class NewPlayerController : MonoBehaviour
 
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         animator = gameObject.GetComponent<Animator>();
+        collider = gameObject.GetComponent<Collider2D>();
+        
+        // getting all enemy info
+        enemies = Object.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
 
         Reset();
     }
@@ -99,13 +114,59 @@ public class NewPlayerController : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.LeftShift)) {
                 isCrouched = !isCrouched;
             }
+            if (Input.GetKeyDown(KeyCode.T)) {
+                inHazard = !inHazard;
+            }
         }
 
-        desiredCameraPosition = new Vector3(transform.position.x + offset.x, 
-                                            transform.position.y + offset.y, 
+        Vector2 dirToEnemy;
+        directionToClosestEnemy = Vector2.up * 100.0f;
+        isChased = false;
+
+        foreach(NewEnemyBehavior enemy in enemies) {
+            dirToEnemy = enemy.transform.position - this.transform.position;
+            if (directionToClosestEnemy.magnitude > dirToEnemy.magnitude) {
+                directionToClosestEnemy = dirToEnemy;
+            }
+            if (enemy.isAlert) {
+                isChased = true;
+            }
+        }
+
+        if (directionToClosestEnemy.magnitude <= detectionRadius) {
+            directionToClosestEnemy = directionToClosestEnemy.normalized;
+        }
+        else {
+            directionToClosestEnemy = Vector2.zero;
+        }
+
+        // CAMERA
+        desiredCameraPosition = new Vector3(transform.position.x + offset.x + directionToClosestEnemy.x * 2.0f, 
+                                            transform.position.y + offset.y + directionToClosestEnemy.y * 2.0f, 
                                             -10.0f);
 
+        float desiredCameraSize = 0;
+        
+        if (!isChased) {
+            desiredCameraSize = 5.0f;
+        }
+        else {
+            desiredCameraSize = 6.0f;
+        }
+        
+        if (CurrHP <= 0) {
+            desiredCameraPosition = new Vector3(transform.position.x + offset.x, 
+                                                transform.position.y + offset.y, 
+                                                -10.0f);
+            desiredCameraSize = 3.0f;
+        }
+
+        camera.orthographicSize = Mathf.Lerp(camera.orthographicSize, desiredCameraSize, cameraSmoothSpeed);
+
         camera.transform.position = Vector3.Lerp(camera.transform.position, desiredCameraPosition, cameraSmoothSpeed);
+        // END OF CAMERA
+
+        globalLight.color = Color.Lerp(Color.red, Color.white, CurrHP/MaxHP);
 
         // Look left when facing left
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(lastInput.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
@@ -118,6 +179,10 @@ public class NewPlayerController : MonoBehaviour
         }
 
         targetVelocity = playerInput * moveSpeed * moveSpeedModifier;
+
+        if (inHazard) {
+            HazardDebuff(0.1f, 0.5f);
+        }
     }
 
     void FixedUpdate() {
@@ -139,6 +204,37 @@ public class NewPlayerController : MonoBehaviour
         EnableAll();
     }
 
+    public IEnumerator TakeDamage(float damageTaken) {
+        if (!isImmune) {
+            DisableAll();
+            Debug.Log("OOF");
+            playAnimationOnce("Player_Damaged");
+            CurrHP -= damageTaken;
+            rigidbody.velocity = Vector2.zero;
+            StartCoroutine(immunityFrame());
+            yield return new WaitForSeconds(0.5f);
+            if (CurrHP <= 0) {
+                GameOver();
+            }
+            else {
+                EnableAll();
+            }
+        }
+    }
+
+    public void GameOver() {
+        StopAllCoroutines();
+        StartCoroutine(Death());
+    }
+
+    private IEnumerator Death() {
+        DisableAll();
+        rigidbody.velocity = Vector2.zero;
+        playAnimationOnce("Player_Death");
+        yield return new WaitForSeconds(0.1f);
+        collider.enabled = false;
+    }
+
     private IEnumerator CallCooldown() {
         canCall = false;
         yield return new WaitForSeconds(callCooldown);
@@ -149,6 +245,12 @@ public class NewPlayerController : MonoBehaviour
         canTumble = false;
         yield return new WaitForSeconds(tumbleCooldown);
         canTumble = true;
+    }
+
+    private IEnumerator immunityFrame() {
+        isImmune = true;
+        yield return new WaitForSeconds(immunityDuration);
+        isImmune = false;
     }
 
     void playAnimationOnce(string animationName) {
@@ -174,6 +276,25 @@ public class NewPlayerController : MonoBehaviour
         actionDisabled = false;
         canCall = true;
         canTumble = true;
+        CurrHP = MaxHP;
+    }
+
+    void HazardDebuff(float slowedMovementSpeed, float damage) {
+        rigidbody.velocity = rigidbody.velocity.normalized * slowedMovementSpeed;
+        if (damage > 0) {
+            StartCoroutine(TakeDamage(damage));
+        }
+    }
+
+    private void OnTriggerStay2D(Collider2D collider) {
+        //Debug.Log(collider.name);
+        if (collider.name == "Poison Hazard") {
+            HazardDebuff(0.3f, 0.5f);
+            Destroy(collider.gameObject);
+        }
+        else {
+            Debug.Log("Unknown Hazard");
+        }
     }
 
     // private void OnCollisionEnter2D(Collision2D collision)
