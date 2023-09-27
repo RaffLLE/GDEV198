@@ -17,6 +17,7 @@ public class NewPlayerController : MonoBehaviour
     public Camera camera;
     public Collider2D collider;
     NewEnemyBehavior[] enemies;
+    public HelperBehavior helper;
     
     [Header("Physics Reference")]
     private float moveSpeed;
@@ -52,13 +53,17 @@ public class NewPlayerController : MonoBehaviour
     [Header("Calculated Values")]
     public float moveSpeedModifier;
     public Vector2 targetVelocity;
-    private Vector2 lastInput;
+    public Vector2 lastInput;
     private Vector2 directionToClosestEnemy;
 
     [Header("Camera Values")]
     public Vector2 offset;
     public Vector3 desiredCameraPosition;
     public float cameraSmoothSpeed;
+    
+    [Header("HP Regen Values")]
+    public float hpRegenInterval;
+    public bool canRegen;
 
     // Start is called before the first frame update
     void Start()
@@ -101,10 +106,15 @@ public class NewPlayerController : MonoBehaviour
             }
         }
 
+        if (!isChased && !isImmune && canRegen) {
+            StartCoroutine(hpRegen());
+        }
+
         // Action Input
         if (!actionDisabled) {
             if (Input.GetKeyDown(KeyCode.E) && canCall) {
                 callEffect.Play();
+                StartCoroutine(helper.AssistResponse());
                 StartCoroutine(CallCooldown());
             }
             if (Input.GetKeyDown(KeyCode.Space) && canTumble && playerInput.magnitude > 0) {
@@ -140,6 +150,10 @@ public class NewPlayerController : MonoBehaviour
             directionToClosestEnemy = Vector2.zero;
         }
 
+        // Helper NPC Info
+        Vector2 directionToHelper = helper.transform.position - transform.position;
+        float distanceToHelper = directionToHelper.magnitude;
+
         // CAMERA
         desiredCameraPosition = new Vector3(transform.position.x + offset.x + directionToClosestEnemy.x * 2.0f, 
                                             transform.position.y + offset.y + directionToClosestEnemy.y * 2.0f, 
@@ -148,17 +162,22 @@ public class NewPlayerController : MonoBehaviour
         float desiredCameraSize = 0;
         
         if (!isChased) {
-            desiredCameraSize = 5.0f;
+            desiredCameraSize = 3.0f;
+            if (distanceToHelper > 2.0f) {
+                desiredCameraPosition = new Vector3(transform.position.x + offset.x + directionToHelper.normalized.x * 2.0f, 
+                                            transform.position.y + offset.y + directionToHelper.normalized.y * 2.0f, 
+                                            -10.0f);
+            }
         }
         else {
-            desiredCameraSize = 6.0f;
+            desiredCameraSize = 4.0f;
         }
         
         if (CurrHP <= 0) {
             desiredCameraPosition = new Vector3(transform.position.x + offset.x, 
                                                 transform.position.y + offset.y, 
                                                 -10.0f);
-            desiredCameraSize = 3.0f;
+            desiredCameraSize = 1.5f;
         }
 
         camera.orthographicSize = Mathf.Lerp(camera.orthographicSize, desiredCameraSize, cameraSmoothSpeed);
@@ -189,6 +208,7 @@ public class NewPlayerController : MonoBehaviour
         if (!moveDisabled) {
             rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
         }
+        enemies = Object.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
     }
 
     private IEnumerator Tumble(Vector2 direction) {
@@ -253,6 +273,13 @@ public class NewPlayerController : MonoBehaviour
         isImmune = false;
     }
 
+    private IEnumerator hpRegen() {
+        canRegen = false;
+        CurrHP += 0.1f;
+        yield return new WaitForSeconds(hpRegenInterval);
+        canRegen = true;
+    }
+
     void playAnimationOnce(string animationName) {
         if(!animator.GetCurrentAnimatorStateInfo(0).IsName(animationName))
         {
@@ -288,9 +315,12 @@ public class NewPlayerController : MonoBehaviour
 
     private void OnTriggerStay2D(Collider2D collider) {
         //Debug.Log(collider.name);
-        if (collider.name == "Poison Hazard") {
+        if (collider.name.Contains("Poison Hazard")) {
             HazardDebuff(0.3f, 0.5f);
-            Destroy(collider.gameObject);
+            //Destroy(collider.gameObject);
+        }
+        if (collider.name.Contains("Water Hazard")) {
+            HazardDebuff(0.1f, 0.0f);
         }
         else {
             Debug.Log("Unknown Hazard");

@@ -9,13 +9,23 @@ using UnityEngine.Events;
 public class HelperBehavior : MonoBehaviour
 {
     public GameObject player;
+    public Rigidbody2D rigidbody;
     Vector2 playerDirection;
+    public AIPath aipath;
     float distanceToPlayer;
     Vector2 facingDirection;
     Animator animator;
     AIDestinationSetter destinationSetter;
     public bool assistReady;
+    public bool isAssisting;
     public float assistCooldown;
+    public float responseDelay;
+    public float castTime;
+    public ParticleSystem responseEffect;
+    public Vector2 dirLastMoved;
+    public Transform castCircle;
+    public float castCircleSizeIncrease;
+    public float castCircleMaxSize;
 
     // Start is called before the first frame update
     void Start()
@@ -23,8 +33,14 @@ public class HelperBehavior : MonoBehaviour
         player = GameObject.FindGameObjectWithTag("Player");
         animator = gameObject.GetComponent<Animator>();
         destinationSetter = gameObject.GetComponent<AIDestinationSetter>();
+        aipath = gameObject.GetComponent<AIPath>();
+        rigidbody = gameObject.GetComponent<Rigidbody2D>();
 
         assistReady = true;
+        isAssisting = false;
+
+        castCircle.localScale = Vector3.zero;
+        castCircleSizeIncrease = 0;
     }
 
     // Update is called once per frame
@@ -36,24 +52,53 @@ public class HelperBehavior : MonoBehaviour
 
         facingDirection = playerDirection;
 
-        // if (assistReady) {
-        //     animator.Play("Merfolk_Idle");
-        //     if (Input.GetKeyDown(KeyCode.X)) {
-        //         animator.Play("Merfolk_Cast");
-        //         StartCoroutine(AssistCooldown());
-        //     }
-        // }
-
-        if (Input.GetKeyDown(KeyCode.X)) {
-            playAnimationOnce("Merfolk_Cast");
+        if (!AnimatorIsPlaying() && aipath.canMove) {
+            if (distanceToPlayer > 1.5f) {
+                playAnimationOnce("Merfolk_Swim");
+            }
+            else {
+                playAnimationOnce("Merfolk_Idle");
+            }
         }
 
-        if (!AnimatorIsPlaying()) {
-            playAnimationOnce("Merfolk_Idle");
+        if (rigidbody.velocity.magnitude != 0) {
+            dirLastMoved = rigidbody.velocity;
         }
 
-        // Look left when facing left
-        transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);//Mathf.Sign(facingDirection.x);
+        if (distanceToPlayer > 1.5f) {
+            aipath.maxSpeed = 4;
+        }
+        else {
+            aipath.maxSpeed = 2;
+        }
+
+        castCircle.localScale += new Vector3(castCircleSizeIncrease, 0, 0);
+
+        if (castCircle.localScale.x > castCircleMaxSize) {
+            castCircleSizeIncrease = 0;
+            castCircle.localScale = Vector3.zero;
+        }
+
+        if (aipath.canMove) {
+            // Look left when facing left
+            transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), transform.localScale.y, transform.localScale.z);
+        }
+        else {
+            transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(dirLastMoved.x), transform.localScale.y, transform.localScale.z);
+        }
+    }
+
+    public IEnumerator AssistResponse() {
+        aipath.canMove = false;
+        playAnimationOnce("Merfolk_Swim");
+        rigidbody.velocity = new Vector2(player.GetComponent<NewPlayerController>().lastInput.normalized.x, 0) * 2.0f;
+        yield return new WaitForSeconds(responseDelay);
+        rigidbody.velocity = Vector2.zero;
+        playAnimationOnce("Merfolk_Cast");
+        castCircleSizeIncrease = 0.2f;
+        responseEffect.Play();
+        yield return new WaitForSeconds(castTime);
+        aipath.canMove = true;
     }
 
     private IEnumerator AssistCooldown() {

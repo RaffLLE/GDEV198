@@ -90,15 +90,24 @@ public class NewEnemyBehavior : MonoBehaviour
     public float currVisionFalloffTimer;
     public float maxVisionFalloffTime;
 
-    // Start is called before the first frame update
-    void Start()
-    {
+    [Header("For Poison Showcase")]
+    public bool canLeavePoisonTrail;
+    public GameObject poisonTrailPrefab;
+    public float trailInterval;
+    public bool spreadPoison;
+
+    void Awake() {
         aipath = gameObject.GetComponent<AIPath>();
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         destinationSetter = gameObject.GetComponent<AIDestinationSetter>();
         player = GameObject.FindGameObjectWithTag("Player");
+        lastSeenLocation = GameObject.FindGameObjectWithTag("LastLocation").transform;
         animator = gameObject.GetComponent<Animator>();
+    }
 
+    // Start is called before the first frame update
+    void Start()
+    {
         facingDirection = Vector2.up;
         rigidbody.velocity = Vector2.zero;
         if (!isAlert) {
@@ -113,10 +122,18 @@ public class NewEnemyBehavior : MonoBehaviour
                     patrolRotationSpeed);
         
         animator.Play("Flying_Enemy_Idle");
+
+        if (canLeavePoisonTrail) {
+            StartCoroutine(LeavePoisonTrail());
+        }
     }
 
     void Update()
     {
+        if (destinationSetter.target == null) {
+            destinationSetter.target = lastSeenLocation;
+        }
+
         // If player is in sights
         if (playerSeen()) {
             // Update last seen location to where player was seen and make the target facing direction the player
@@ -178,10 +195,10 @@ public class NewEnemyBehavior : MonoBehaviour
             // Adjust intensity of light from enemy based on distance to player
             float playerDetectionRadius = player.GetComponent<NewPlayerController>().detectionRadius;
             visionCone.intensity = peripheralVision.intensity 
-                = Mathf.Lerp(0.2f, 1.5f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius);
+                = Mathf.Lerp(0.2f, 1.0f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius);
         }
         else {
-            visionCone.intensity = peripheralVision.intensity = 1.2f;
+            visionCone.intensity = peripheralVision.intensity = 0.9f;
         }
 
         // Look left when facing left
@@ -201,8 +218,8 @@ public class NewEnemyBehavior : MonoBehaviour
 
     private IEnumerator StartState(){
 
-        yield return new WaitForSeconds(aiStartDelay);
         targetClosestPatrolPoint();
+        yield return new WaitForSeconds(aiStartDelay);
         changeSpeed(patrolMovementSpeed,
                     patrolRotationSpeed);
         peripheralRadius = normalPeripheralRadius;
@@ -338,7 +355,7 @@ public class NewEnemyBehavior : MonoBehaviour
 
     private IEnumerator Attack() {
 
-        float lockOnDelay = attackWindup * 0.2f;
+        float lockOnDelay = attackWindup * 0.1f;
 
         // wind up
         Debug.Log("Wind Up");
@@ -414,6 +431,12 @@ public class NewEnemyBehavior : MonoBehaviour
         else {
             StartCoroutine(Stunned());
         }
+    }
+
+    private IEnumerator LeavePoisonTrail() {
+        yield return new WaitForSeconds(trailInterval);
+        Instantiate(poisonTrailPrefab, transform.position, transform.rotation);
+        StartCoroutine(LeavePoisonTrail());
     }
 
     // ---------------------------------------------------
@@ -564,9 +587,12 @@ public class NewEnemyBehavior : MonoBehaviour
         if (!canAttack) {
             directionSign = -directionSign;
         }
-        if (tempVelocity.magnitude >= 3.0f) {
+        if (tempVelocity.magnitude >= chaseMovementSpeed) {
             Debug.Log("OW");
             StopAllCoroutines();
+            if (canLeavePoisonTrail) {
+                StartCoroutine(LeavePoisonTrail());
+            }
             StartCoroutine(Knockback(collision.gameObject.transform.position, collision.collider.CompareTag("Player")));
         }
         // You can access collision information and handle the collision here
