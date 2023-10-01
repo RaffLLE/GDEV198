@@ -106,7 +106,7 @@ public class NewPlayerController : MonoBehaviour
             }
         }
 
-        if (!isChased && !isImmune && canRegen) {
+        if (!isChased && !isImmune && canRegen && CurrHP < MaxHP) {
             StartCoroutine(hpRegen());
         }
 
