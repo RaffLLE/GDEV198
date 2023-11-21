@@ -17,7 +17,7 @@ public class NewPlayerController : MonoBehaviour
     public ParticleSystem callEffect;
     public Animator animator;
     public Camera camera;
-    public Collider2D collider;
+    public CapsuleCollider2D collider;
     NewEnemyBehavior[] enemies;
     public HelperBehavior helper;
     
@@ -75,7 +75,7 @@ public class NewPlayerController : MonoBehaviour
 
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         animator = gameObject.GetComponent<Animator>();
-        collider = gameObject.GetComponent<Collider2D>();
+        collider = gameObject.GetComponent<CapsuleCollider2D>();
         
         // getting all enemy info
         try {
@@ -92,7 +92,6 @@ public class NewPlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
         // Movement
         if (!moveDisabled) {
             playerInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
@@ -113,6 +112,16 @@ public class NewPlayerController : MonoBehaviour
                     playAnimationOnce("Player_Walk");
                 }
             }
+            if (isCrouched) {
+                collider.size = new Vector2(0.2f, 0.3f);
+                playerLight.pointLightOuterRadius = 0.5f;
+                playerLight.pointLightInnerRadius = 0.4f;
+            }
+            else {
+                collider.size = new Vector2(0.3f, 0.6f);
+                playerLight.pointLightOuterRadius = 1.0f;
+                playerLight.pointLightInnerRadius = 0.5f;
+            }
         }
 
         if (!isChased && !isImmune && canRegen && CurrHP < MaxHP) {
@@ -120,7 +129,7 @@ public class NewPlayerController : MonoBehaviour
         }
 
         // Action Input
-        if (!actionDisabled) {
+        if (!actionDisabled || Time.timeScale == 0) {
             if (Input.GetKeyDown(KeyCode.E) && canCall) {
                 callEffect.Play();
                 if (helper != null) {
@@ -189,6 +198,9 @@ public class NewPlayerController : MonoBehaviour
                 desiredCameraPosition = new Vector3(transform.position.x + offset.x + directionToHelper.normalized.x * 2.0f, 
                                             transform.position.y + offset.y + directionToHelper.normalized.y * 2.0f, 
                                             -10.0f);
+            }
+            else if (isCrouched) {
+                desiredCameraSize = 2.0f;
             }
         }
         else {

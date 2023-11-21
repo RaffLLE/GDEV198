@@ -53,7 +53,7 @@ public class HelperBehavior : MonoBehaviour
         facingDirection = playerDirection;
 
         if (!AnimatorIsPlaying() && aipath.canMove) {
-            if (distanceToPlayer > 1.5f) {
+            if (distanceToPlayer > 2.5f) {
                 playAnimationOnce("Merfolk_Swim");
             }
             else {

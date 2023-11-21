@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System;
+using UnityEngine.Events;
 
 public class DialogueManager : MonoBehaviour {
 
@@ -13,6 +15,8 @@ public class DialogueManager : MonoBehaviour {
 	public Animator animator;
 
 	Dialogue nextDialogue;
+
+	public UnityEvent onDialogueEnd;
 
 	private Queue<string> sentences;
 
@@ -48,6 +52,14 @@ public class DialogueManager : MonoBehaviour {
 		}
 		else {
 			nextDialogue = null;
+		}
+
+		// Check if there is another dialogue afterwards
+		if (dialogue.onDialogueEnd != null) {
+			onDialogueEnd = dialogue.onDialogueEnd;
+		}
+		else {
+			onDialogueEnd = null;
 		}
 
 		sentences.Clear();
@@ -87,6 +99,7 @@ public class DialogueManager : MonoBehaviour {
 	{
 		if (nextDialogue == null) {
 			animator.SetBool("IsOpen", false);
+			onDialogueEnd?.Invoke();
 		}
 		else {
 			StartDialogue(nextDialogue);

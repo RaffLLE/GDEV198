@@ -89,6 +89,7 @@ public class NewEnemyBehavior : MonoBehaviour
     [Header("Others")]
     public float currVisionFalloffTimer;
     public float maxVisionFalloffTime;
+    public bool fixedLight;
 
     [Header("For Poison Showcase")]
     public bool canLeavePoisonTrail;
@@ -198,6 +199,10 @@ public class NewEnemyBehavior : MonoBehaviour
                 = Mathf.Lerp(0.0f, 0.5f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius) + 1.0f;
         }
         else {
+            visionCone.intensity = peripheralVision.intensity = 1.1f;
+        }
+
+        if (fixedLight) {
             visionCone.intensity = peripheralVision.intensity = 1.1f;
         }
 
