@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 // For Couroutine
 using UnityEngine.Events;
+// For Error
+using System;
 
 public class NewPlayerController : MonoBehaviour
 {
@@ -76,7 +78,13 @@ public class NewPlayerController : MonoBehaviour
         collider = gameObject.GetComponent<Collider2D>();
         
         // getting all enemy info
-        enemies = Object.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
+        try {
+            enemies = GameObject.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
+        }
+        catch (NullReferenceException ex) {
+            //Debug.Log(ex);
+            enemies = null;
+        }
 
         Reset();
     }
@@ -84,6 +92,7 @@ public class NewPlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
         // Movement
         if (!moveDisabled) {
             playerInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
@@ -114,8 +123,10 @@ public class NewPlayerController : MonoBehaviour
         if (!actionDisabled) {
             if (Input.GetKeyDown(KeyCode.E) && canCall) {
                 callEffect.Play();
-                StartCoroutine(helper.AssistResponse());
-                StartCoroutine(CallCooldown());
+                if (helper != null) {
+                    StartCoroutine(helper.AssistResponse());
+                }
+                    StartCoroutine(CallCooldown());
             }
             if (Input.GetKeyDown(KeyCode.Space) && canTumble && playerInput.magnitude > 0) {
                 StartCoroutine(Tumble(playerInput));
@@ -151,8 +162,19 @@ public class NewPlayerController : MonoBehaviour
         }
 
         // Helper NPC Info
-        Vector2 directionToHelper = helper.transform.position - transform.position;
-        float distanceToHelper = directionToHelper.magnitude;
+        Vector2 directionToHelper;
+        float distanceToHelper;
+
+        try {
+            directionToHelper = helper.transform.position - transform.position;
+            distanceToHelper = directionToHelper.magnitude;
+        } 
+        catch (NullReferenceException ex) {
+            
+            //Debug.Log(ex);
+            directionToHelper = Vector2.down;
+            distanceToHelper = 0.0f;
+        }
 
         // CAMERA
         desiredCameraPosition = new Vector3(transform.position.x + offset.x + directionToClosestEnemy.x * 2.0f, 
@@ -208,7 +230,7 @@ public class NewPlayerController : MonoBehaviour
         if (!moveDisabled) {
             rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * movementAcceleration);
         }
-        enemies = Object.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
+        enemies = GameObject.FindObjectsOfType(typeof(NewEnemyBehavior)) as NewEnemyBehavior[];
     }
 
     private IEnumerator Tumble(Vector2 direction) {

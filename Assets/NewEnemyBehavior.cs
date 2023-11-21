@@ -195,10 +195,10 @@ public class NewEnemyBehavior : MonoBehaviour
             // Adjust intensity of light from enemy based on distance to player
             float playerDetectionRadius = player.GetComponent<NewPlayerController>().detectionRadius;
             visionCone.intensity = peripheralVision.intensity 
-                = Mathf.Lerp(0.2f, 1.0f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius);
+                = Mathf.Lerp(0.0f, 0.5f, 1 - Mathf.Clamp(distanceToPlayer,0 , playerDetectionRadius)/playerDetectionRadius) + 1.0f;
         }
         else {
-            visionCone.intensity = peripheralVision.intensity = 0.9f;
+            visionCone.intensity = peripheralVision.intensity = 1.1f;
         }
 
         // Look left when facing left
