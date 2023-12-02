@@ -5,12 +5,13 @@ using UnityEngine;
 public class FINALPlayerScript : MonoBehaviour
 {
     // REFERENCE
-    private Rigidbody2D rigidbody;
-    private CapsuleCollider2D collider;
+    private new Rigidbody2D rigidbody;
+    private new CapsuleCollider2D collider;
     private Animator animator;
 
     // STATS
     public float moveSpeed;
+    public float moveAcceleration; // The larger this is, the faster the player gets to the target velocity
 
     // VARIABLES
     Vector2 playerInput;
@@ -33,6 +34,6 @@ public class FINALPlayerScript : MonoBehaviour
     }
 
     void FixedUpdate() {
-        rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime);
+        rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * moveAcceleration);
     }
 }
