@@ -15,8 +15,10 @@ public class FINALPlayerScript : MonoBehaviour
 
     // VARIABLES
     Vector2 playerInput;
-    Vector2 targetVelocity;
     Vector2 lastInput;
+    Vector2 targetVelocity;
+
+    float movementCrouchModifier;
 
     bool isCrouched;
 
@@ -41,9 +43,8 @@ public class FINALPlayerScript : MonoBehaviour
 
     void FixedUpdate() {
 
-        targetVelocity = playerInput * moveSpeed;
-
         if (isCrouched) {
+            movementCrouchModifier = 0.5f;
             if (playerInput.magnitude == 0) {
                 playNewAnimation("Player_Crouch_Idle");
             }
@@ -52,6 +53,7 @@ public class FINALPlayerScript : MonoBehaviour
             }
         }
         else {
+            movementCrouchModifier = 1.0f;
             if (playerInput.magnitude == 0) {
                 playNewAnimation("Player_Idle");
             }
@@ -59,6 +61,8 @@ public class FINALPlayerScript : MonoBehaviour
                 playNewAnimation("Player_Walk");
             }
         }
+
+        targetVelocity = playerInput * moveSpeed * movementCrouchModifier;
 
         // Look left when facing left
         if (playerInput.magnitude != 0) {
