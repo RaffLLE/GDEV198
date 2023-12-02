@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class CreateBridge : MonoBehaviour
 {
-    public Collider2D collider;
+    //public new Collider2D collider;
     public GameObject land;
     public GameObject water;
 

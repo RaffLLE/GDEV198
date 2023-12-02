@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class WaterRemovalMagic : MonoBehaviour
 {
-    public Collider2D collider;
+    public new Collider2D collider;
 
     // Start is called before the first frame update
     void Start()

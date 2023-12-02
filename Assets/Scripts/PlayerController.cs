@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 public class PlayerController : MonoBehaviour
 {
     public Animator animator;
-    public Rigidbody2D rigidbody;
+    public new Rigidbody2D rigidbody;
 
     EnemyBehavior[] enemies;
 

@@ -9,7 +9,7 @@ using UnityEngine.Events;
 public class HelperBehavior : MonoBehaviour
 {
     public GameObject player;
-    public Rigidbody2D rigidbody;
+    public new Rigidbody2D rigidbody;
     Vector2 playerDirection;
     public AIPath aipath;
     float distanceToPlayer;

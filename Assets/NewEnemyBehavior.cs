@@ -13,7 +13,7 @@ public class NewEnemyBehavior : MonoBehaviour
     [Header("Objects")]
     public GameObject player;
     public AIPath aipath;
-    public Rigidbody2D rigidbody;
+    public new Rigidbody2D rigidbody;
     public AIDestinationSetter destinationSetter;
     Animator animator;    
     public Light2D visionCone;

@@ -11,13 +11,13 @@ using System;
 public class NewPlayerController : MonoBehaviour
 {
     [Header("Object Reference")]
-    public Rigidbody2D rigidbody;
+    public new Rigidbody2D rigidbody;
     public Light2D playerLight;
     public Light2D globalLight;
     public ParticleSystem callEffect;
     public Animator animator;
-    public Camera camera;
-    public CapsuleCollider2D collider;
+    public new Camera camera;
+    public new CapsuleCollider2D collider;
     NewEnemyBehavior[] enemies;
     public HelperBehavior helper;
     
