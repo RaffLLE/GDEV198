@@ -8,8 +8,9 @@ public class FINALPlayerScript : MonoBehaviour
     private new Rigidbody2D rigidbody;
     private new CapsuleCollider2D collider;
     private Animator animator;
+    private PlayerHP playerHealth;
 
-    // STATS
+    [Header("Stats")]
     public float moveSpeed;
     public float moveAcceleration; // The larger this is, the faster the player gets to the target velocity
 
@@ -18,9 +19,17 @@ public class FINALPlayerScript : MonoBehaviour
     Vector2 lastInput;
     Vector2 targetVelocity;
 
+    // CALCULATION VARIABLES
     float movementCrouchModifier;
 
+    // STATES
     bool isCrouched;
+    bool canMove;
+    bool canAction;
+
+    [Header("Tumble Action")]
+    bool canTumble;
+    public float tumbleCooldown;
 
     // Start is called before the first frame update
     void Start()
@@ -28,6 +37,9 @@ public class FINALPlayerScript : MonoBehaviour
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         collider = gameObject.GetComponent<CapsuleCollider2D>();
         animator = gameObject.GetComponent<Animator>();
+        playerHealth = gameObject.GetComponent<PlayerHP>();
+
+        Reset();
     }
 
     // Update is called once per frame
@@ -42,6 +54,8 @@ public class FINALPlayerScript : MonoBehaviour
     }
 
     void FixedUpdate() {
+
+        if (!canMove) return;
 
         if (isCrouched) {
             movementCrouchModifier = 0.5f;
@@ -62,7 +76,11 @@ public class FINALPlayerScript : MonoBehaviour
             }
         }
 
-        targetVelocity = playerInput * moveSpeed * movementCrouchModifier;
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            if (canTumble) {
+                StartCoroutine(Tumble(playerInput));
+            }
+        }
 
         // Look left when facing left
         if (playerInput.magnitude != 0) {
@@ -71,16 +89,50 @@ public class FINALPlayerScript : MonoBehaviour
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(lastInput.x), transform.localScale.y, transform.localScale.z);
 
         // Applying the calculated velocity 
+        targetVelocity = playerInput * moveSpeed * movementCrouchModifier;
         rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * moveAcceleration);
+    }
+
+    // ACTION FUNCTIONS
+    private IEnumerator Tumble(Vector2 direction) {
+        DisableAll();
+        playNewAnimation("Player_Tumble");
+        rigidbody.velocity = direction * 6.0f;
+        yield return new WaitForSeconds(0.5f);
+        rigidbody.velocity = Vector2.zero;
+        playNewAnimation("Player_Getup");
+        yield return new WaitForSeconds(0.7f);      
+        StartCoroutine(TumbleCooldown(tumbleCooldown));
+        EnableAll();
+    }
+
+    private IEnumerator TumbleCooldown(float cooldown) {
+        canTumble = false;
+        yield return new WaitForSeconds(cooldown);
+        canTumble = true;
     }
 
     // HELPER FUNCTIONS 
 
     // This function plays a given animation, but only calls it if the desired animation is not yet playing
     void playNewAnimation(string animationName) {
-        if(!animator.GetCurrentAnimatorStateInfo(0).IsName(animationName))
-        {
+        if(!animator.GetCurrentAnimatorStateInfo(0).IsName(animationName)) {
             animator.Play(animationName);
         }
+    }
+
+    void EnableAll() {
+        canAction = true;
+        canMove = true;
+    }
+
+    void DisableAll() {
+        canAction = false;
+        canMove = false;
+    }
+
+    void Reset() {
+        EnableAll();
+        canTumble = true;
     }
 }
