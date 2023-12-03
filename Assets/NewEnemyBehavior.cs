@@ -533,8 +533,7 @@ public class NewEnemyBehavior : MonoBehaviour
         UpdateDestination(patrolPoints[pointIndex]);
     }
 
-    public void UpdateDestination(Transform nextWaypoint)
-    {
+    public void UpdateDestination(Transform nextWaypoint){
         destinationSetter.target = nextWaypoint;
     }
 

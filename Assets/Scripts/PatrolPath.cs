@@ -7,6 +7,8 @@ public class PatrolPath : MonoBehaviour
 {
     public Transform[] waypoints;
     int waypointIndex;
+    public float waitTimeBetweenPoints; 
+    bool isActive;
 
     AIDestinationSetter destinationSetter;
 
@@ -15,17 +17,23 @@ public class PatrolPath : MonoBehaviour
     {
         destinationSetter = gameObject.GetComponent<AIDestinationSetter>();
         UpdateDestination(waypoints[waypointIndex]); 
+        isActive = true;
     }
 
     // Update is called once per frame
     void FixedUpdate()
     {
         //When enemy reaches patrol point go to next one
-        if (Vector2.Distance(this.transform.position, destinationSetter.target.position) < 0.2)
+        if (Vector2.Distance(this.transform.position, destinationSetter.target.position) < 0.2 && isActive)
         {
             IterateWaypointIndex();
-            UpdateDestination(waypoints[waypointIndex]);
+            StartCoroutine(WaitToNewPoint());
         }
+    }
+
+    private IEnumerator WaitToNewPoint() { 
+        yield return new WaitForSeconds(waitTimeBetweenPoints);
+        UpdateDestination(waypoints[waypointIndex]);
     }
 
     //sets target of script to next waypoint
@@ -40,5 +48,14 @@ public class PatrolPath : MonoBehaviour
         if (waypointIndex == waypoints.Length){
             waypointIndex = 0;
         }
+    }
+
+    public void Disable() {
+        isActive = false;
+    }
+
+    public void Enable() {
+        isActive = true;
+        UpdateDestination(waypoints[waypointIndex]);
     }
 }

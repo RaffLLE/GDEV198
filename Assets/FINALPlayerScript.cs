@@ -21,6 +21,7 @@ public class FINALPlayerScript : MonoBehaviour
     Vector2 playerInput;
     Vector2 lastInput;
     Vector2 targetVelocity;
+    int adrenaline;
 
     // CALCULATION VARIABLES
     float movementCrouchModifier;
@@ -59,6 +60,9 @@ public class FINALPlayerScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (adrenaline > 0) {
+            camera.Alert();
+        }
 
         if (!canMove) return;
 
@@ -195,6 +199,17 @@ public class FINALPlayerScript : MonoBehaviour
         }
     }
 
+    public void increaseAdrenaline() {
+        adrenaline += 1;
+    }
+
+    public void decreaseAdrenaline() {
+        adrenaline -= 1;
+        if (adrenaline < 1) {
+            camera.Reset();
+        }
+    }
+
     void EnableAll() {
         //canAction = true;
         canMove = true;
@@ -207,6 +222,7 @@ public class FINALPlayerScript : MonoBehaviour
 
     void Reset() {
         EnableAll();
+        adrenaline = 0;
         canTumble = true;
     }
 }

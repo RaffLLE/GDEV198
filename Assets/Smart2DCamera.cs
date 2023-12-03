@@ -132,7 +132,7 @@ public class Smart2DCamera : MonoBehaviour
     }
 
     // Change State
-    void Alert() {
+    public void Alert() {
         useNormalSettings();
         CameraSizeLock(true);
         CameraMoveLock(true);
