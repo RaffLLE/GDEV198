@@ -6,12 +6,10 @@ public class PlayerHP : MonoBehaviour
 {
     public float maxHP;
     public float currHP;
-    private bool canHeal;
     public bool isImmune;
 
     void Start() {
         currHP = maxHP;
-        canHeal = true;
         isImmune = false;
     }
 

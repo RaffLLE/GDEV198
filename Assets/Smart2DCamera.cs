@@ -105,29 +105,29 @@ public class Smart2DCamera : MonoBehaviour
     // Helper Functions
 
     // Changing Transforms
-    void ChangeFollow(Transform newFollow) {
+    public void ChangeFollow(Transform newFollow) {
         follow = newFollow;    
     }
-    void ChangeLookAt(Transform newLookAt) {
+    public void ChangeLookAt(Transform newLookAt) {
         lookAt = newLookAt;    
     }
 
     // Adjust Size
-    void ChangeCameraSize(float size) {
+    public void ChangeCameraSize(float size) {
         activeCameraSize = size;    
     }
-    void ChangeSizeSmooth(float speed) {
+    public void ChangeSizeSmooth(float speed) {
         cameraSizeSmoothSpeed = speed;
     }
-    void ChangeMoveSmooth(float speed) {
+    public void ChangeMoveSmooth(float speed) {
         cameraSmoothSpeed = speed;
     }
 
     // Boolean
-    void CameraSizeLock(bool input) {
+    public void CameraSizeLock(bool input) {
         staticCameraSize = input;
     }
-    void CameraMoveLock(bool input) {
+    public void CameraMoveLock(bool input) {
         staticCameraFocus = input;
     }
 
@@ -141,13 +141,13 @@ public class Smart2DCamera : MonoBehaviour
         ChangeSizeSmooth(0.05f);
     }
 
-    void Reset() {
+    public void Reset() {
         useNormalSettings();
         CameraSizeLock(false);
         CameraMoveLock(false);
         ChangeCameraSize(baseCameraSize);
         ChangeMoveSmooth(0.025f);
-        ChangeSizeSmooth(0.02f);
+        ChangeSizeSmooth(0.04f);
     }
 
     void useTempSettings(Transform target, float size, float panSpeed) {

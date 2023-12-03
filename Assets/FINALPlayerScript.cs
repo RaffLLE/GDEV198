@@ -1,15 +1,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+// For Error
+using System;
 
 public class FINALPlayerScript : MonoBehaviour
 {
-    // REFERENCE
+    [Header("Objects")]
+    public new Smart2DCamera camera;
     private new Rigidbody2D rigidbody;
     private new CapsuleCollider2D collider;
     private Animator animator;
     private PlayerHP playerHealth;
-    private Smart2DCamera camera;
 
     [Header("Stats")]
     public float moveSpeed;
@@ -26,15 +28,15 @@ public class FINALPlayerScript : MonoBehaviour
     // STATES
     bool isCrouched;
     bool canMove;
-    bool canAction;
+    //bool canAction;
 
     [Header("Tumble Action")]
-    bool canTumble;
     public float tumbleCooldown;
+    bool canTumble;
 
     [Header ("HP")]
-    bool canRegen;
     public float regenCooldown;
+    bool canRegen;
 
     // Start is called before the first frame update
     void Start()
@@ -44,20 +46,40 @@ public class FINALPlayerScript : MonoBehaviour
         animator = gameObject.GetComponent<Animator>();
         playerHealth = gameObject.GetComponent<PlayerHP>();
 
+        try {
+            camera.Reset();
+        } 
+        catch (NullReferenceException ex) { 
+            Debug.Log(ex);
+        }
+
         Reset();
     }
 
     // Update is called once per frame
     void Update()
     {
+
+        if (!canMove) return;
+
         // Player Input
         playerInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
 
         if (Input.GetKeyDown(KeyCode.LeftShift)) {
             isCrouched = !isCrouched;
+            if (camera != null) {
+                if (isCrouched) {
+                    camera.ChangeCameraSize(2.5f);
+                    camera.CameraMoveLock(true);
+                    camera.CameraSizeLock(true);
+                }
+                else {
+                    camera.Reset();
+                }
+            }
         }
     }
-
+    
     void FixedUpdate() {
 
         if (Input.GetKeyDown(KeyCode.T)) {
@@ -112,6 +134,8 @@ public class FINALPlayerScript : MonoBehaviour
     // ACTION FUNCTIONS
     private IEnumerator Tumble(Vector2 direction) {
         DisableAll();
+        isCrouched = false;
+        camera.Reset();
         playNewAnimation("Player_Tumble");
         rigidbody.velocity = direction * 6.0f;
         yield return new WaitForSeconds(0.5f);
@@ -172,12 +196,12 @@ public class FINALPlayerScript : MonoBehaviour
     }
 
     void EnableAll() {
-        canAction = true;
+        //canAction = true;
         canMove = true;
     }
 
     void DisableAll() {
-        canAction = false;
+        //canAction = false;
         canMove = false;
     }
 
