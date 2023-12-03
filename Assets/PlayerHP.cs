@@ -7,7 +7,7 @@ public class PlayerHP : MonoBehaviour
     public float maxHP;
     public float currHP;
     private bool canHeal;
-    private bool isImmune;
+    public bool isImmune;
 
     void Start() {
         currHP = maxHP;
@@ -21,14 +21,18 @@ public class PlayerHP : MonoBehaviour
         isImmune = false;
     }
 
-    void heal(float value) {
-        currHP += value;
-        currHP = Mathf.Clamp(currHP, maxHP, 0.0f);
+    public void containHP() {
+        currHP = Mathf.Clamp(currHP, 0.0f, maxHP);
     }
 
-    void damage(float value, float immunityDuration) {
+    public void heal(float value) {
+        currHP += value;
+        //currHP = Mathf.Clamp(currHP, maxHP, 0.0f);
+    }
+
+    public void damage(float value, float immunityDuration) {
         currHP -= value;
-        currHP = Mathf.Clamp(currHP, maxHP, 0.0f);
+        //currHP = Mathf.Clamp(currHP, maxHP, 0.0f);
         StartCoroutine(immunityFrame(immunityDuration));
     }
 }

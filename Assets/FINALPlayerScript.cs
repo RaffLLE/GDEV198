@@ -9,6 +9,7 @@ public class FINALPlayerScript : MonoBehaviour
     private new CapsuleCollider2D collider;
     private Animator animator;
     private PlayerHP playerHealth;
+    private Smart2DCamera camera;
 
     [Header("Stats")]
     public float moveSpeed;
@@ -30,6 +31,10 @@ public class FINALPlayerScript : MonoBehaviour
     [Header("Tumble Action")]
     bool canTumble;
     public float tumbleCooldown;
+
+    [Header ("HP")]
+    bool canRegen;
+    public float regenCooldown;
 
     // Start is called before the first frame update
     void Start()
@@ -54,6 +59,17 @@ public class FINALPlayerScript : MonoBehaviour
     }
 
     void FixedUpdate() {
+
+        if (Input.GetKeyDown(KeyCode.T)) {
+            StartCoroutine(TakeDamage(1.0f, 2.0f));
+        }
+
+        if (canRegen) {
+            playerHealth.heal(Time.timeScale * 0.0025f);
+            if (playerHealth.currHP > playerHealth.maxHP) {
+                playerHealth.containHP();
+            }
+        }
 
         if (!canMove) return;
 
@@ -105,11 +121,45 @@ public class FINALPlayerScript : MonoBehaviour
         StartCoroutine(TumbleCooldown(tumbleCooldown));
         EnableAll();
     }
-
     private IEnumerator TumbleCooldown(float cooldown) {
         canTumble = false;
         yield return new WaitForSeconds(cooldown);
         canTumble = true;
+    }
+
+    public IEnumerator TakeDamage(float damageTaken, float immunityDuration) {
+        if (!playerHealth.isImmune && playerHealth.currHP > 0) {
+            DisableAll();
+            Debug.Log("OOF");
+            StartCoroutine(RegenCooldown(regenCooldown));
+            playerHealth.damage(damageTaken, immunityDuration);
+            playNewAnimation("Player_Damaged");
+            rigidbody.velocity = Vector2.zero;
+            yield return new WaitForSeconds(0.5f);
+            if (playerHealth.currHP <= 0) {
+                GameOver();
+            }
+            else {
+                EnableAll();
+            }
+        }
+    }
+    private IEnumerator RegenCooldown(float cooldown) {
+        canRegen = false;
+        yield return new WaitForSeconds(regenCooldown);
+        canRegen = true;
+    }
+
+    public void GameOver() {
+        StopAllCoroutines();
+        StartCoroutine(Death());
+    }
+
+    private IEnumerator Death() {
+        DisableAll();
+        playNewAnimation("Player_Death");
+        yield return new WaitForSeconds(0.1f);
+        collider.enabled = false;
     }
 
     // HELPER FUNCTIONS 
