@@ -133,7 +133,6 @@ public class Smart2DCamera : MonoBehaviour
 
     // Change State
     public void Alert() {
-        useNormalSettings();
         CameraSizeLock(true);
         CameraMoveLock(true);
         ChangeCameraSize(baseCameraSize * 1.6f);
@@ -150,7 +149,7 @@ public class Smart2DCamera : MonoBehaviour
         ChangeSizeSmooth(0.04f);
     }
 
-    void useTempSettings(Transform target, float size, float panSpeed) {
+    public void useTempSettings(Transform target, float size, float panSpeed) {
         useTemp = true;
         
         tempTarget = target;
@@ -159,7 +158,7 @@ public class Smart2DCamera : MonoBehaviour
         tempSizeSmooth = panSpeed;
     }
 
-    void useNormalSettings() {
+    public void useNormalSettings() {
         useTemp = false;
     }
 }

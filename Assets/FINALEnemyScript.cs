@@ -31,6 +31,7 @@ public class FINALEnemyScript : MonoBehaviour
     public float chaseMovementAcceleration;
 
     [Header("Misc Movement Values")]
+    public bool canMove;
     public float slowdownDistance;
     public bool slowdownWhenNear;
     private float moveSpeedModifier;
@@ -48,12 +49,18 @@ public class FINALEnemyScript : MonoBehaviour
     private protected Vector2 desiredDirection; // current direction of the path 
     private protected Vector2 facingDirection;
     private protected Vector2 targetVelocity;
+        
+    // Values relative to player
+    private protected Vector2 playerDirection;
+    private protected float distanceToPlayer;
+    private protected float angleToPlayer;
 
     [Header("States")]
-    private protected Coroutine isPatroling;
-    private protected Coroutine isAlerted;
-    private protected Coroutine isSearching;
-    private protected Coroutine isChasing;
+    private protected bool isPatroling;
+    private protected bool isAlerted;
+    private protected bool isSearching;
+    private protected bool isProwling;
+    private protected bool isChasing;
     
     [Header("Layers")] 
     public LayerMask obstaclesLayerMask;
@@ -65,6 +72,7 @@ public class FINALEnemyScript : MonoBehaviour
     // Start is called before the first frame update
     protected virtual void Start()
     {
+        
         rigidbody = gameObject.GetComponent<Rigidbody2D>();
         animator = gameObject.GetComponent<Animator>();
         aipath = gameObject.GetComponent<AIPath>();
@@ -78,11 +86,13 @@ public class FINALEnemyScript : MonoBehaviour
         }
 
         Reset();
+        ResetStates();
     }
 
     // Update is called once per frame
     protected virtual void Update()
     {
+        if (!canMove) { return;}
         // Reset modifiers
         moveSpeedModifier = 1.0f;
         rotationSpeedModifier = 1.0f;
@@ -91,8 +101,22 @@ public class FINALEnemyScript : MonoBehaviour
         targetDirection = (destinationSetter.target.transform.position - transform.position).normalized;
         distanceToTarget = (destinationSetter.target.transform.position - transform.position).magnitude;
         angleToTarget = Vector2.Angle(facingDirection, targetDirection);
+        
+        // Values relative to player 
+        if (player != null) {
+            playerDirection = (player.transform.position - transform.position).normalized;
+            distanceToPlayer = (player.transform.position - transform.position).magnitude;
+            angleToPlayer = Vector2.Angle(facingDirection, playerDirection);
+        }
 
-        desiredDirection = (Vector2)(aipath.steeringTarget - transform.position).normalized; // Calculate the direction towards the path laid out by AIPath
+        if (isAlerted) {
+            desiredDirection = targetDirection;
+            //Debug.Log("ALERTED");
+        }
+        else {
+            desiredDirection = (Vector2)(aipath.steeringTarget - transform.position).normalized; // Calculate the direction towards the path laid out by AIPath
+            //Debug.Log("not alerted");
+        }
 
         float angle = Vector2.Angle(facingDirection, desiredDirection); // Calculate the angle between the current vector and the target vector
         float signedAngle = Vector2.SignedAngle(facingDirection, desiredDirection); // Calculate the signed angle between current vector and target vector
@@ -115,49 +139,53 @@ public class FINALEnemyScript : MonoBehaviour
         // Rotate the current vector
         facingDirection = Quaternion.Euler(0, 0, newAngle) * facingDirection;
 
-        if (isPatroling != null) {
-            targetVelocity = desiredDirection * movementSpeed * moveSpeedModifier;
-            transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(desiredDirection.x), 
-                                                transform.localScale.y, 
-                                                transform.localScale.z);
-            //Debug.Log("Patroling");
-        }
-        else {
-            targetVelocity = facingDirection * movementSpeed * moveSpeedModifier;
-            transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), 
-                                                transform.localScale.y, 
-                                                transform.localScale.z);
-            //Debug.Log("NOT Patroling");
-        }
-
+        targetVelocity = facingDirection * movementSpeed * moveSpeedModifier;
+        transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(facingDirection.x), 
+                                            transform.localScale.y, 
+                                            transform.localScale.z);
+                                            
         if (playerInPeripheralVision() || playerInDirectVision()) {
             lastSeenLocation.position = player.transform.position;
         }
     }
 
     protected private void Reset() {
+        
         facingDirection = Vector2.up;
         rigidbody.velocity = Vector2.zero;
     }
 
+    protected private void ResetStates() {
+             
+        isPatroling = false;
+        isAlerted = false;
+        isSearching = false;
+        isProwling = false;
+        isChasing = false;
+    }
+
     // Helper Functions
     protected private void changeSpeed(float newMovementSpeed, float newRotationSpeed, float newAcceleration) {
+        
         movementSpeed = newMovementSpeed;
         rotationSpeed = newRotationSpeed;
         movementAcceleration = newAcceleration;
     } 
 
     protected private void playNewAnimation(string animationName) {
+        
         if(!animator.GetCurrentAnimatorStateInfo(0).IsName(animationName)) {
             animator.Play(animationName);
         }
     }
 
     public void UpdateDestination(Transform nextWaypoint){
+        
         destinationSetter.target = nextWaypoint;
     }
 
     private Vector2 rotateVector(Vector2 v, float angle) {
+        
         // Convert the rotation angle from degrees to radians
         float rotationAngleRadians = angle * Mathf.Deg2Rad;
 
@@ -168,13 +196,10 @@ public class FINALEnemyScript : MonoBehaviour
         return new Vector2(newX, newY);
     }
 
-    protected private bool playerInPeripheralVision() {
+    protected virtual bool playerInPeripheralVision() {
+        
         if (player == null) return false;
         
-        // Values relative to player
-        Vector2 playerDirection = (player.transform.position - transform.position).normalized;
-        float distanceToPlayer = (player.transform.position - transform.position).magnitude;
-
         RaycastHit2D hit = 
             Physics2D.Raycast(transform.position, playerDirection, peripheralRadius, obstaclesLayerMask);
 
@@ -190,13 +215,9 @@ public class FINALEnemyScript : MonoBehaviour
     }
 
     protected private bool playerInDirectVision() {
+        
         if (player == null) return false;
         
-        // Values relative to player
-        Vector2 playerDirection = (player.transform.position - transform.position).normalized;
-        float distanceToPlayer = (player.transform.position - transform.position).magnitude;
-        float angleToPlayer = Vector2.Angle(facingDirection, playerDirection);
-
         RaycastHit2D hit = 
             Physics2D.Raycast(transform.position, playerDirection, visionRadius , obstaclesLayerMask);
 
@@ -216,6 +237,7 @@ public class FINALEnemyScript : MonoBehaviour
     // Gizmos
     void OnDrawGizmos()
     {
+        
         if (aipath != null)
         {
             // Draws a blue line from this transform to the target
