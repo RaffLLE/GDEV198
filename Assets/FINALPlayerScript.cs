@@ -24,7 +24,7 @@ public class FINALPlayerScript : MonoBehaviour
     int adrenaline;
 
     // CALCULATION VARIABLES
-    float movementCrouchModifier;
+    float movementModifier;
 
     // STATES
     public bool isCrouched;
@@ -37,7 +37,7 @@ public class FINALPlayerScript : MonoBehaviour
 
     [Header ("HP")]
     public float regenCooldown;
-    bool canRegen;
+    float currRegenCooldown;
     
     [Header("Layers")] 
     public LayerMask vaultableLayer;
@@ -63,6 +63,12 @@ public class FINALPlayerScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
+        if (playerHealth.currHP <= 0) {
+            DisableAll();
+            rigidbody.velocity = Vector2.zero;
+        }
+
         if (adrenaline > 0) {
             camera.Alert();
         }
@@ -93,17 +99,20 @@ public class FINALPlayerScript : MonoBehaviour
             StartCoroutine(TakeDamage(1.0f, 2.0f));
         }
 
-        if (canRegen) {
+        if (currRegenCooldown <= 0) {
             playerHealth.heal(Time.timeScale * 0.0025f);
             if (playerHealth.currHP > playerHealth.maxHP) {
                 playerHealth.containHP();
             }
         }
+        else {
+            currRegenCooldown -= Time.timeScale;
+        }
 
         if (!canMove) return;
 
         if (isCrouched) {
-            movementCrouchModifier = 0.5f;
+            movementModifier = 0.5f;
             if (playerInput.magnitude == 0) {
                 playNewAnimation("Player_Crouch_Idle");
             }
@@ -112,7 +121,7 @@ public class FINALPlayerScript : MonoBehaviour
             }
         }
         else {
-            movementCrouchModifier = 1.0f;
+            movementModifier = 1.0f;
             if (playerInput.magnitude == 0) {
                 playNewAnimation("Player_Idle");
             }
@@ -134,7 +143,7 @@ public class FINALPlayerScript : MonoBehaviour
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(lastInput.x), transform.localScale.y, transform.localScale.z);
 
         // Applying the calculated velocity 
-        targetVelocity = playerInput * moveSpeed * movementCrouchModifier;
+        targetVelocity = playerInput * moveSpeed * movementModifier;
         rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * moveAcceleration);
     }
 
@@ -161,15 +170,20 @@ public class FINALPlayerScript : MonoBehaviour
     public IEnumerator TakeDamage(float damageTaken, float immunityDuration) {
         if (!playerHealth.isImmune && playerHealth.currHP > 0) {
             DisableAll();
-            StartCoroutine(RegenCooldown(regenCooldown));
+            isCrouched = false;
+            camera.Reset();
+            
+            StartRegenCooldown(regenCooldown);
             playerHealth.damage(damageTaken, immunityDuration);
             playNewAnimation("Player_Damaged");
             rigidbody.velocity = Vector2.zero;
+            yield return new WaitForSeconds(0.5f);
             if (playerHealth.currHP <= 0) {
                 GameOver();
             }
-            yield return new WaitForSeconds(0.5f);
-            EnableAll();
+            else {
+                EnableAll();
+            }
         }
     }
 
@@ -177,6 +191,8 @@ public class FINALPlayerScript : MonoBehaviour
         if (canMove) {
             DisableAll();
             isCrouched = false;
+            camera.Reset();
+
             transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * -Mathf.Sign(impactDirection.x), transform.localScale.y, transform.localScale.z);
 
             playNewAnimation("Player_Knockedback");
@@ -199,14 +215,12 @@ public class FINALPlayerScript : MonoBehaviour
         }
     }
 
-    private IEnumerator RegenCooldown(float cooldown) {
-        canRegen = false;
-        yield return new WaitForSeconds(regenCooldown);
-        canRegen = true;
+    void StartRegenCooldown(float cooldown) {
+        currRegenCooldown = cooldown * 100;
     }
 
     private IEnumerator Death() {
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.3f);
         playNewAnimation("Player_Death");
         collider.enabled = false;
         camera.useTempSettings(this.transform, 2.0f, 0.025f);
@@ -215,11 +229,7 @@ public class FINALPlayerScript : MonoBehaviour
     public void GameOver() {
         DisableAll();
         StopAllCoroutines();
-
         StartCoroutine(Death());
-        // playNewAnimation("Player_Death");
-        // collider.enabled = false;
-        // camera.useTempSettings(this.transform, 1.5f, 0.025f);
     }
 
     // HELPER FUNCTIONS 
@@ -261,5 +271,9 @@ public class FINALPlayerScript : MonoBehaviour
         EnableAll();
         adrenaline = 0;
         canTumble = true;
+    }
+
+    public void Slowdown(float value) {
+        rigidbody.velocity = rigidbody.velocity.normalized * value;
     }
 }
