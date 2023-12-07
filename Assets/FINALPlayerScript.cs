@@ -3,15 +3,19 @@ using System.Collections.Generic;
 using UnityEngine;
 // For Error
 using System;
+// For Volume
+using UnityEngine.Rendering;
 
 public class FINALPlayerScript : MonoBehaviour
 {
     [Header("Objects")]
+    public ScreenDamageEffect screenFX;
     public new Smart2DCamera camera;
     private new Rigidbody2D rigidbody;
     private new CapsuleCollider2D collider;
     private Animator animator;
-    private PlayerHP playerHealth;
+    public PlayerHP playerHealth;
+    private FINALEnemyScript[] enemies;
 
     [Header("Stats")]
     public float moveSpeed;
@@ -28,6 +32,9 @@ public class FINALPlayerScript : MonoBehaviour
 
     // STATES
     public bool isCrouched;
+    public bool isDecaying;
+    public bool isCursed;
+    public float curseTimer;
     bool canMove;
     //bool canAction;
 
@@ -63,14 +70,67 @@ public class FINALPlayerScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        float distanceToClosestEnemy = 100.0f;
+        adrenaline = 0;
 
-        if (playerHealth.currHP <= 0) {
-            DisableAll();
-            rigidbody.velocity = Vector2.zero;
+        // getting all enemy info
+        try {
+            enemies = GameObject.FindObjectsOfType(typeof(FINALEnemyScript)) as FINALEnemyScript[];
+        }
+        catch (NullReferenceException ex) {
+            //Debug.Log(ex);
+            enemies = null;
         }
 
-        if (adrenaline > 0) {
-            camera.Alert();
+        foreach(FINALEnemyScript enemy in enemies) {
+            if (distanceToClosestEnemy > Vector2.Distance(this.transform.position, enemy.transform.position)) {
+                distanceToClosestEnemy = Vector2.Distance(this.transform.position, enemy.transform.position);
+                camera.lookAt = enemy.transform;
+            }
+            if (enemy.isChasing || enemy.isProwling) {
+                adrenaline += 1;
+            }
+        }
+
+        if (isDecaying) {
+            currRegenCooldown = 1.0f;
+            playerHealth.currHP -= Time.deltaTime;
+
+            if (playerHealth.currHP <= 0) {
+                isDecaying = false;
+                rigidbody.velocity = Vector2.zero;
+                DisableAll();
+                StopAllCoroutines();
+                playerHealth.currHP = 0;
+                StartCoroutine(Death());
+            }
+        }
+
+        if (isCursed) {
+            curseTimer -= Time.deltaTime;
+            if (curseTimer <= 0) {
+                curseTimer = 0;
+                isCursed = false;
+            }
+        }
+
+        if (camera != null && playerHealth.currHP > 0.0f) {
+            if (isCursed) {
+                camera.ChangeCameraSize(camera.baseCameraSize - 0.5f);
+                camera.CameraMoveLock(true);
+                camera.CameraSizeLock(true);
+            }
+            else if (adrenaline > 0) {
+                camera.Alert();
+            }
+            else if (isCrouched) {
+                camera.ChangeCameraSize(camera.baseCameraSize - 0.5f);
+                camera.CameraMoveLock(true);
+                camera.CameraSizeLock(true);
+            }
+            else {
+                camera.Reset();
+            }
         }
 
         if (!canMove) return;
@@ -80,23 +140,29 @@ public class FINALPlayerScript : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.LeftShift)) {
             isCrouched = !isCrouched;
-            if (camera != null && adrenaline < 1) {
-                if (isCrouched) {
-                    camera.ChangeCameraSize(2.5f);
-                    camera.CameraMoveLock(true);
-                    camera.CameraSizeLock(true);
-                }
-                else {
-                    camera.Reset();
-                }
-            }
         }
     }
     
     void FixedUpdate() {
 
-        if (Input.GetKeyDown(KeyCode.T)) {
-            StartCoroutine(TakeDamage(1.0f, 2.0f));
+        // if (Input.GetKeyDown(KeyCode.T)) {
+        //     StartCoroutine(TakeDamage(1.0f, 2.0f));
+        // }
+
+        if (!canMove) return;
+
+        // Look left when facing left
+        if (playerInput.magnitude != 0) {
+            lastInput = playerInput;
+        }
+
+        if (isCursed) {
+             // Applying the calculated velocity 
+            targetVelocity = lastInput * moveSpeed * movementModifier;
+            rigidbody.velocity = Vector2.Lerp(rigidbody.velocity, targetVelocity, Time.deltaTime * moveAcceleration);
+            transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(lastInput.x), transform.localScale.y, transform.localScale.z);
+            Slowdown(0.4f);
+            return;
         }
 
         if (currRegenCooldown <= 0) {
@@ -108,8 +174,6 @@ public class FINALPlayerScript : MonoBehaviour
         else {
             currRegenCooldown -= Time.timeScale;
         }
-
-        if (!canMove) return;
 
         if (isCrouched) {
             movementModifier = 0.5f;
@@ -136,10 +200,6 @@ public class FINALPlayerScript : MonoBehaviour
             }
         }
 
-        // Look left when facing left
-        if (playerInput.magnitude != 0) {
-            lastInput = playerInput;
-        }
         transform.localScale = new Vector3 (Mathf.Abs(transform.localScale.x) * Mathf.Sign(lastInput.x), transform.localScale.y, transform.localScale.z);
 
         // Applying the calculated velocity 
@@ -167,18 +227,20 @@ public class FINALPlayerScript : MonoBehaviour
         canTumble = true;
     }
 
-    public IEnumerator TakeDamage(float damageTaken, float immunityDuration) {
+    public IEnumerator TakeDamage(float damageTaken, float immunityDuration, Color color) {
         if (!playerHealth.isImmune && playerHealth.currHP > 0) {
             DisableAll();
             isCrouched = false;
             camera.Reset();
-            
+            screenFX.changeColor(color);
+
             StartRegenCooldown(regenCooldown);
             playerHealth.damage(damageTaken, immunityDuration);
             playNewAnimation("Player_Damaged");
             rigidbody.velocity = Vector2.zero;
             yield return new WaitForSeconds(0.5f);
             if (playerHealth.currHP <= 0) {
+                playerHealth.currHP = 0.0f;
                 GameOver();
             }
             else {
@@ -204,7 +266,7 @@ public class FINALPlayerScript : MonoBehaviour
             if (damaging) {
                 playNewAnimation("Player_Getup");
                 yield return new WaitForSeconds(0.3f);
-                StartCoroutine(TakeDamage(damageValue, immunityDuration));
+                StartCoroutine(TakeDamage(damageValue, immunityDuration, Color.red));
                 yield return new WaitForSeconds(0.3f);
             }
             else {
@@ -241,22 +303,6 @@ public class FINALPlayerScript : MonoBehaviour
         }
     }
 
-    public void increaseAdrenaline() {
-        adrenaline += 1;
-    }
-
-    public void decreaseAdrenaline() {
-        adrenaline -= 1;
-        if (adrenaline < 1) {
-            try {
-                camera.Reset();
-            }
-            catch (NullReferenceException ex) { 
-                Debug.Log(ex);
-            }
-        }
-    }
-
     void EnableAll() {
         //canAction = true;
         canMove = true;
@@ -271,6 +317,11 @@ public class FINALPlayerScript : MonoBehaviour
         EnableAll();
         adrenaline = 0;
         canTumble = true;
+    }
+
+    public void Curse(float duration) {
+        isCursed = true;
+        curseTimer = duration;
     }
 
     public void Slowdown(float value) {

@@ -141,7 +141,6 @@ public class Smart2DCamera : MonoBehaviour
     }
 
     public void Reset() {
-        useNormalSettings();
         CameraSizeLock(false);
         CameraMoveLock(false);
         ChangeCameraSize(baseCameraSize);

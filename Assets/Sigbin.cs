@@ -1,36 +1,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-// For AIPath
-using Pathfinding;
 
-public class Markupo : FINALEnemyScript
+public class Sigbin : FINALEnemyScript
 {
-    public bool isAmbush;
-    public float poisonCooldown;
-    public float currPoisonCooldown; 
-    public GameObject poisonPuddle;
-    protected override void Start()
+    public float attackCooldown;
+    float currAttackCooldown;
+    public float attackDistance; 
+    public bool isAttacking;
+    private Vector2 tempVelocity;
+    // Start is called before the first frame update
+    void Start()
     {
         base.Start();
-        base.changeSpeed(base.patrolMovementSpeed, 
-                         base.patrolRotationSpeed, 
-                         base.patrolMovementAcceleration);
-        if (!isAmbush) {
-            StartCoroutine(PatrolState());
-        }
-        currPoisonCooldown = poisonCooldown;
+        changeSpeed(patrolMovementSpeed, 
+                    patrolRotationSpeed, 
+                    patrolMovementAcceleration);
+        StartCoroutine(PatrolState());
     }
 
-    protected override void Update()
+    // Update is called once per frame
+    void Update()
     {
-        if (currPoisonCooldown > 0.0f && isPatroling) {
-            currPoisonCooldown -= Time.deltaTime;
+        if (currAttackCooldown > 0.0f) {
+            currAttackCooldown -= Time.deltaTime;
         }
+
         base.Update();
+        
+        // for collision purposes
+        tempVelocity = rigidbody.velocity;
     }
 
-    // States
     protected IEnumerator PatrolState() { 
         isPatroling = true;
         path.Enable();
@@ -43,54 +44,37 @@ public class Markupo : FINALEnemyScript
                     patrolMovementAcceleration);
 
         GetComponent<Rigidbody2D>().velocity = Vector2.Lerp(GetComponent<Rigidbody2D>().velocity, targetVelocity, Time.deltaTime * movementAcceleration);
-        if (GetComponent<Rigidbody2D>().velocity.magnitude > 0.5f) {
-            base.playNewAnimation("Fire_Worm_Walk");
+        if (GetComponent<Rigidbody2D>().velocity.magnitude > 0.1f) {
+            base.playNewAnimation("Black_Dog_Run");
         }
         else {
-            base.playNewAnimation("Fire_Worm_Idle");
+            base.playNewAnimation("Black_Dog_Idle");
         }
 
         // Transition
-        if (playerInDirectVision()) {
+        if (playerInDirectVision() || (playerInPeripheralVision() && distanceToPlayer < 1.5f)) {
             isPatroling = false;
             StartCoroutine(ProwlState());
         }
-        else if ((playerInPeripheralVision() && !player.GetComponent<FINALPlayerScript>().isCrouched) || playerInPeripheralVision() && distanceToPlayer < 2.0f) {
+        else if ((playerInPeripheralVision() && !player.GetComponent<FINALPlayerScript>().isCrouched)) {
             isPatroling = false;
             StartCoroutine(AlertState());
-        }
-        else if (currPoisonCooldown <= 0.0f) {  
-            isPatroling = false;
-            StartCoroutine(Excrete());
         }
         else {
             StartCoroutine(PatrolState());
         }
     }
 
-    protected IEnumerator Excrete() {
-        path.Disable();
-
-        GetComponent<Rigidbody2D>().velocity = Vector2.zero;
-        playNewAnimation("Fire_Worm_Death");
-        yield return new WaitForSeconds(2.5f);
-        if (poisonPuddle != null) {
-            Instantiate(poisonPuddle, transform.position, transform.rotation);
-        }
-        currPoisonCooldown = poisonCooldown;
-        StartCoroutine(PatrolState());
-    }
-
     protected IEnumerator AlertState() {
         isAlerted = true;
         path.Disable();
 
-        playNewAnimation("Fire_Worm_Attack");
+        playNewAnimation("Black_Dog_Hit");
         UpdateDestination(base.lastSeenLocation);
         rotationSpeed = 2.0f;
         GetComponent<Rigidbody2D>().velocity = Vector2.zero;
         yield return new WaitForSeconds(2.0f);
-        playNewAnimation("Fire_Worm_Death");
+        playNewAnimation("Black_Dog_Attack");
         yield return new WaitForSeconds(1.0f);
 
         // Transition
@@ -116,10 +100,10 @@ public class Markupo : FINALEnemyScript
 
         GetComponent<Rigidbody2D>().velocity = Vector2.Lerp(GetComponent<Rigidbody2D>().velocity, targetVelocity, Time.deltaTime * movementAcceleration);
         if (GetComponent<Rigidbody2D>().velocity.magnitude > 0.5f) {
-            playNewAnimation("Fire_Worm_Walk");
+            playNewAnimation("Black_Dog_Run");
         }
         else {
-            playNewAnimation("Fire_Worm_Idle");
+            playNewAnimation("Black_Dog_Idle");
         }
 
         // Transition
@@ -142,12 +126,12 @@ public class Markupo : FINALEnemyScript
         path.Disable();
         yield return new WaitForSeconds(aiUpdateDelay);
 
-        playNewAnimation("Fire_Worm_Attack");
+        playNewAnimation("Black_Dog_Hit");
         UpdateDestination(base.lastSeenLocation);
         rotationSpeed = 5.0f;
         GetComponent<Rigidbody2D>().velocity = Vector2.zero;
         yield return new WaitForSeconds(0.5f);
-        playNewAnimation("Fire_Worm_Death");
+        playNewAnimation("Black_Dog_Attack");
         yield return new WaitForSeconds(0.5f);
 
         // Transition
@@ -157,11 +141,13 @@ public class Markupo : FINALEnemyScript
 
     protected IEnumerator ChaseState() {
         isChasing = true;
+        path.Disable();
         yield return new WaitForSeconds(aiUpdateDelay);
+        UpdateDestination(base.lastSeenLocation);
 
         slowdownWhenNear = false;
 
-        playNewAnimation("Fire_Worm_Walk");
+        playNewAnimation("Black_Dog_Run");
         changeSpeed(chaseMovementSpeed, 
                     chaseRotationSpeed, 
                     chaseMovementAcceleration);
@@ -174,18 +160,80 @@ public class Markupo : FINALEnemyScript
             path.Enable();
             isChasing = false;
         }
+        else if (currAttackCooldown <= 0.0f && playerInPeripheralVision() && distanceToPlayer <= attackDistance) {
+            StartCoroutine(Attack());
+        }
         else {
             StartCoroutine(ChaseState());
         }
+    }
+    private IEnumerator Attack() {
+
+        isAttacking = true;
+
+        // wind up
+        Debug.Log("Wind Up");
+        animator.Play("Black_Dog_Hit");
+        rigidbody.velocity = Vector2.zero;
+        changeSpeed(movementSpeed, 
+                    0.5f,
+                    5.0f);
+
+        yield return new WaitForSeconds(1.0f);
+
+        // set target
+        Vector2 attackDirection = facingDirection.normalized; 
+        changeSpeed(movementSpeed, 
+                    0.1f,
+                    5.0f);
+        animator.Play("Black_Dog_Attack");
+        yield return new WaitForSeconds(0.2f);
+
+        // attack
+        Debug.Log("Attack");
+        rigidbody.velocity = attackDirection * 8.0f;
+        yield return new WaitForSeconds(0.6f);
+        currAttackCooldown = attackCooldown;
+
+        // stop
+        rigidbody.velocity = Vector2.zero;
+        changeSpeed(chaseMovementSpeed, 
+                    chaseRotationSpeed,
+                    chaseMovementAcceleration);
+
+        animator.Play("Black_Dog_Attack");
+        yield return new WaitForSeconds(0.6f);
+        // go back to chase
+        StartCoroutine(ChaseState());
+        isAttacking = false;
     }
 
     protected IEnumerator Flinch() {
 
         GetComponent<Rigidbody2D>().velocity = Vector2.zero;
-        playNewAnimation("Fire_Worm_Hit");
-        yield return new WaitForSeconds(0.5f);
-        playNewAnimation("Fire_Worm_Death");
+        playNewAnimation("Black_Dog_Hit");
+        yield return new WaitForSeconds(2.0f);
+        playNewAnimation("Black_Dog_Attack");
         yield return new WaitForSeconds(1.0f);
+
+        // Transition
+        if (isChasing) {
+            StartCoroutine(ChaseState());
+        }
+        else {
+            StartCoroutine(PatrolState());
+        }
+    }
+
+    protected IEnumerator Knockdown() {
+
+        GetComponent<Rigidbody2D>().velocity = tempVelocity * -1.0f;
+        playNewAnimation("Black_Dog_Hit");
+        yield return new WaitForSeconds(0.1f);
+        
+        GetComponent<Rigidbody2D>().velocity = Vector2.zero;
+        playNewAnimation("Black_Dog_Death");
+        yield return new WaitForSeconds(2.0f);
 
         // Transition
         if (isChasing) {
@@ -200,8 +248,14 @@ public class Markupo : FINALEnemyScript
 
         if (collision.transform.tag == "Player") {
             StopAllCoroutines();
-            StartCoroutine(collision.transform.GetComponent<FINALPlayerScript>().Knockback(playerDirection, 5.0f, true, 1.0f, 1.0f));
+            StartCoroutine(collision.transform.GetComponent<FINALPlayerScript>().TakeDamage(0.0f, 10.0f, Color.black));
+            player.GetComponent<FINALPlayerScript>().isDecaying = true;
             StartCoroutine(Flinch());
+        }
+        else if (tempVelocity.magnitude >= 3.0f && isAttacking) {
+            Debug.Log("OW");
+            StopAllCoroutines();
+            StartCoroutine(Knockdown());
         }
     }
 }

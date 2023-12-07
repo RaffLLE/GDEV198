@@ -23,7 +23,7 @@ public class PoisonPuddle : MonoBehaviour
     private void OnTriggerStay2D(Collider2D collider) {
 
         if (collider.transform.tag == "Player") {
-            StartCoroutine(collider.transform.GetComponent<FINALPlayerScript>().TakeDamage(0.5f, 1.5f));
+            StartCoroutine(collider.transform.GetComponent<FINALPlayerScript>().TakeDamage(0.5f, 1.5f, Color.green));
             collider.transform.GetComponent<FINALPlayerScript>().Slowdown(slowAmount);
         }
     }

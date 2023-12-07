@@ -6,7 +6,7 @@ using Pathfinding;
 public class PatrolPath : MonoBehaviour
 {
     public Transform[] waypoints;
-    int waypointIndex;
+    public int waypointIndex;
     public float waitTimeBetweenPoints; 
     bool isActive;
 
@@ -43,7 +43,7 @@ public class PatrolPath : MonoBehaviour
     }
 
     //iterates between waypoints
-    void IterateWaypointIndex(){
+    public void IterateWaypointIndex(){
         waypointIndex++;
         if (waypointIndex == waypoints.Length){
             waypointIndex = 0;
@@ -56,6 +56,5 @@ public class PatrolPath : MonoBehaviour
 
     public void Enable() {
         isActive = true;
-        UpdateDestination(waypoints[waypointIndex]);
     }
 }

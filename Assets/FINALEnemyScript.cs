@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 // For AIPath
 using Pathfinding;
+// For 2D Light
+using UnityEngine.Rendering.Universal;
 
 public class FINALEnemyScript : MonoBehaviour
 {
@@ -41,6 +43,10 @@ public class FINALEnemyScript : MonoBehaviour
     public float peripheralRadius;
     public float visionRadius;
     public float visionAngle;
+    
+    [Header("Light Values")]
+    public Light2D directVision;
+    public Light2D peripheralVision;
 
     // Calculated Variables
     private protected Vector2 targetDirection; // straight line to target
@@ -49,6 +55,10 @@ public class FINALEnemyScript : MonoBehaviour
     private protected Vector2 desiredDirection; // current direction of the path 
     private protected Vector2 facingDirection;
     private protected Vector2 targetVelocity;
+
+    // Timers
+    private protected float detectionFalloff;
+    private protected float interestFalloff;
         
     // Values relative to player
     private protected Vector2 playerDirection;
@@ -56,11 +66,11 @@ public class FINALEnemyScript : MonoBehaviour
     private protected float angleToPlayer;
 
     [Header("States")]
-    private protected bool isPatroling;
-    private protected bool isAlerted;
-    private protected bool isSearching;
-    private protected bool isProwling;
-    private protected bool isChasing;
+    public bool isPatroling;
+    public bool isAlerted;
+    public bool isSearching;
+    public bool isProwling;
+    public bool isChasing;
     
     [Header("Layers")] 
     public LayerMask obstaclesLayerMask;
@@ -118,6 +128,13 @@ public class FINALEnemyScript : MonoBehaviour
             //Debug.Log("not alerted");
         }
 
+        if (playerInPeripheralVision() || playerInDirectVision()) {
+            interestFalloff = 15.0f;
+        }
+        if (isChasing) {
+            interestFalloff -= Time.deltaTime;
+        }
+
         float angle = Vector2.Angle(facingDirection, desiredDirection); // Calculate the angle between the current vector and the target vector
         float signedAngle = Vector2.SignedAngle(facingDirection, desiredDirection); // Calculate the signed angle between current vector and target vector
         float sign = Mathf.Sign(signedAngle); // Gives 1 or -1 given the signedAngle
@@ -145,7 +162,24 @@ public class FINALEnemyScript : MonoBehaviour
                                             transform.localScale.z);
                                             
         if (playerInPeripheralVision() || playerInDirectVision()) {
+            detectionFalloff = 1.0f;
+        }
+
+        if (detectionFalloff > 0.0f) {
             lastSeenLocation.position = player.transform.position;
+            detectionFalloff -= Time.deltaTime;
+        }
+
+        directVision.transform.eulerAngles = new Vector3(0, 0, Vector2.SignedAngle(Vector2.up, facingDirection));
+        directVision.pointLightOuterAngle = visionAngle;
+        directVision.pointLightOuterRadius = visionRadius;
+
+        peripheralVision.pointLightOuterRadius = Mathf.Min(peripheralRadius, visionRadius);
+        
+        if (isAlerted || isProwling || isSearching || isChasing) {
+            directVision.pointLightOuterRadius = directVision.pointLightOuterRadius * 1.1f;
+            peripheralVision.pointLightOuterRadius = peripheralVision.pointLightOuterRadius * 1.1f;
+
         }
     }
 
